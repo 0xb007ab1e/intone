@@ -29,7 +29,7 @@ use ssip_client_async::{ClientError, ClientName, ClientScope, MessageScope};
 use tokio::io::{AsyncBufRead, AsyncWrite};
 
 use oxeye_core::exclusions::{Context as ExclusionContext, ExclusionEngine};
-use oxeye_core::{Action, Settings};
+use oxeye_core::{Action, Settings, Speech};
 
 /// X keysyms for the keys we react to.
 const KEYSYM_CONTROL_L: u32 = 0xffe3;
@@ -343,9 +343,48 @@ async fn connect_speech(settings: &Settings) -> Result<SsipClient> {
     tts.set_client_name(ClientName::new("oxeye", "oxeye"))
         .await
         .context("registering SSIP client name")?;
-    let rate = ((i16::from(settings.speech_rate) - 50) * 2).clamp(-100, 100) as i8;
-    let _ = tts.set_rate(ClientScope::Current, rate).await;
+    apply_speech_settings(&mut tts, &settings.speech).await;
     Ok(tts)
+}
+
+/// Apply rate/pitch/volume/voice/language/output-module from settings (best-effort).
+async fn apply_speech_settings(tts: &mut SsipClient, speech: &Speech) {
+    if let Some(module) = &speech.output_module {
+        let _ = tts.set_output_module(ClientScope::Current, module).await;
+    }
+    if let Some(voice) = &speech.voice {
+        let _ = tts.set_synthesis_voice(ClientScope::Current, voice).await;
+    }
+    if let Some(lang) = &speech.language {
+        let _ = tts.set_language(ClientScope::Current, lang).await;
+    }
+    let _ = tts
+        .set_rate(ClientScope::Current, to_ssip_scale(speech.rate))
+        .await;
+    let _ = tts
+        .set_pitch(ClientScope::Current, to_ssip_scale(speech.pitch))
+        .await;
+    let _ = tts
+        .set_volume(ClientScope::Current, to_ssip_scale(speech.volume))
+        .await;
+}
+
+/// Map a 0..=100 user setting onto SSIP's -100..=100 scale (50 -> 0, 100 -> +100).
+fn to_ssip_scale(value: u8) -> i8 {
+    (i16::from(value) * 2 - 100).clamp(-100, 100) as i8
+}
+
+#[cfg(test)]
+mod scale_tests {
+    use super::to_ssip_scale;
+
+    #[test]
+    fn maps_0_100_onto_ssip_range() {
+        assert_eq!(to_ssip_scale(50), 0);
+        assert_eq!(to_ssip_scale(0), -100);
+        assert_eq!(to_ssip_scale(100), 100);
+        assert_eq!(to_ssip_scale(75), 50);
+    }
 }
 
 /// Build an accessible proxy for the event's object and return `(app, name, role)`.
