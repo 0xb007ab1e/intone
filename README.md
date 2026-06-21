@@ -66,3 +66,14 @@ oxeye-linux  — AT-SPI2 tree reader + KWin a11y KeyboardMonitor input (Wayland 
 Parrot OS 7 "Echo", KDE Plasma 6 / KWin Wayland: AT-SPI2 tree access works; global key
 capture available via KWin's `org.freedesktop.a11y.KeyboardMonitor`; speech engine needs
 install (`speech-dispatcher` + `espeak-ng`). Details in `LINUX-FIRST-PLAN.md`.
+
+## Running
+
+```sh
+cargo run -p oxeye-linux                      # speak (needs audio + speech-dispatcher)
+OXEYE_SPEECH=text cargo run -p oxeye-linux    # print announcements (headless/remote dev)
+```
+
+Developing remotely and want to *hear* it? Either use `OXEYE_SPEECH=text`, or route the audio
+to your machine over SSH/tailnet — see [`docs/remote-audio.md`](docs/remote-audio.md)
+(`scripts/remote-audio.sh` automates it).
