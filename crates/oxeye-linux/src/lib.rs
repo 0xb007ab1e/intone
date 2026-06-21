@@ -358,8 +358,10 @@ async fn read_focus(
     let proxy = AccessibleProxy::builder(conn.connection())
         .destination(ev.sender())?
         .path(ev.path())?
-        // Don't pre-fetch/cache properties (a GetAll on build): lighter, and avoids a
-        // heavier code path on the app's a11y bridge.
+        // AT-SPI properties have no PropertiesChanged signal (changes arrive via AT-SPI's own
+        // events), so zbus's default caching would serve stale data — and the eager GetAll it
+        // issues on build SIGSEGVs Qt's a11y bridge. The atspi crate disables caching for the
+        // same reason. See docs/investigations/qt-atspi-caching.md (issue #6).
         .cache_properties(zbus::proxy::CacheProperties::No)
         .build()
         .await
