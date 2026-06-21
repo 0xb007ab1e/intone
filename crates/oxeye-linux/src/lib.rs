@@ -18,7 +18,7 @@
 
 use anyhow::{Context as _, Result};
 use atspi::connection::AccessibilityConnection;
-use atspi::events::object::StateChangedEvent;
+use atspi::events::object::{StateChangedEvent, TextCaretMovedEvent};
 use atspi::events::EventProperties;
 use atspi::proxy::accessible::AccessibleProxy;
 use atspi::proxy::text::TextProxy;
@@ -225,6 +225,9 @@ pub async fn run() -> Result<()> {
     conn.register_event::<StateChangedEvent>()
         .await
         .context("registering for state-changed events")?;
+    conn.register_event::<TextCaretMovedEvent>()
+        .await
+        .context("registering for caret-moved events")?;
     let atspi_events = conn.event_stream();
     futures_lite::pin!(atspi_events);
 
@@ -256,43 +259,76 @@ pub async fn run() -> Result<()> {
     speaker.announce("oxeye spike running", true).await;
 
     let mut last_text: Option<String> = None;
+    let mut caret: Option<CaretTracker> = None;
 
     loop {
         tokio::select! {
             Some(event) = atspi_events.next() => {
                 let Ok(event) = event else { continue };
-                let Event::Object(ObjectEvents::StateChanged(state)) = event else {
-                    continue;
-                };
-                if state.state != State::Focused || !state.enabled {
-                    continue;
-                }
-                let focused = match read_focus(&conn, &state).await {
-                    Ok(focused) => focused,
-                    Err(err) => {
-                        tracing::debug!(%err, "could not describe focused element");
-                        continue;
+                match event {
+                    Event::Object(ObjectEvents::StateChanged(state)) => {
+                        if state.state != State::Focused || !state.enabled {
+                            continue;
+                        }
+                        let focused = match read_focus(&conn, &state).await {
+                            Ok(focused) => focused,
+                            Err(err) => {
+                                tracing::debug!(%err, "could not describe focused element");
+                                continue;
+                            }
+                        };
+                        // Track the caret for editable text objects, remembering whether it is a
+                        // password field so caret moves there never echo characters.
+                        caret = focused.has_text.then(|| CaretTracker {
+                            sender: state.sender().to_string(),
+                            path: state.path().to_string(),
+                            password: focused.role == "password text",
+                            last: None,
+                        });
+                        let ctx = ExclusionContext {
+                            app: &focused.app,
+                            role: &focused.role,
+                            name: &focused.name,
+                        };
+                        let action = exclusions.evaluate(&ctx);
+                        let element = announcement::Element {
+                            ident: ctx,
+                            description: &focused.description,
+                            value: focused.value.as_deref(),
+                            states: focused.states,
+                        };
+                        let composed =
+                            announcement::compose(&element, settings.verbosity, action);
+                        let Some(ann) = composed else {
+                            continue; // suppressed by an exclusion rule
+                        };
+                        last_text = Some(ann.text.clone());
+                        speaker.announce(&ann.text, ann.interrupt).await;
                     }
-                };
-                let ctx = ExclusionContext {
-                    app: &focused.app,
-                    role: &focused.role,
-                    name: &focused.name,
-                };
-                let action = exclusions.evaluate(&ctx);
-                let element = announcement::Element {
-                    ident: ctx,
-                    description: &focused.description,
-                    // Numeric value via the AT-SPI Value interface; text-field content (Text
-                    // interface) is a further follow-up.
-                    value: focused.value.as_deref(),
-                    states: focused.states,
-                };
-                let Some(ann) = announcement::compose(&element, settings.verbosity, action) else {
-                    continue; // suppressed by an exclusion rule
-                };
-                last_text = Some(ann.text.clone());
-                speaker.announce(&ann.text, ann.interrupt).await;
+                    Event::Object(ObjectEvents::TextCaretMoved(moved)) => {
+                        let Some(tracker) = caret.as_mut() else { continue };
+                        if moved.sender().to_string() != tracker.sender
+                            || moved.path().to_string() != tracker.path
+                        {
+                            continue; // a caret move on some other (stale) object
+                        }
+                        let new = moved.position;
+                        // Speak only a genuine move: never echo a password field, and treat the
+                        // first event after focus as a baseline (the caret placed on focus).
+                        let spoken = match (tracker.password, tracker.last) {
+                            (true, _) | (_, None) => None,
+                            (false, Some(last)) => {
+                                read_caret_text(&conn, &moved, last, new).await
+                            }
+                        };
+                        tracker.last = Some(new);
+                        if let Some(text) = spoken {
+                            last_text = Some(text.clone());
+                            speaker.announce(&text, true).await;
+                        }
+                    }
+                    _ => {}
+                }
             }
             Some(signal) = key_events.next() => {
                 let Ok(args) = signal.args() else { continue };
@@ -420,6 +456,8 @@ struct Focused {
     description: String,
     value: Option<String>,
     states: announcement::States,
+    /// Whether the object exposes the AT-SPI Text interface (so the caret can be tracked).
+    has_text: bool,
 }
 
 /// Build an accessible proxy for the event's object and read its describable attributes.
@@ -490,6 +528,7 @@ async fn read_focus(conn: &AccessibilityConnection, ev: &StateChangedEvent) -> R
         description,
         value,
         states,
+        has_text,
     })
 }
 
@@ -558,9 +597,94 @@ fn format_value(value: f64) -> String {
     }
 }
 
+/// Tracks the caret in the currently focused editable text object so caret-moved events can
+/// announce the traversed character (or the word/line on a larger jump) relative to the last
+/// known position.
+struct CaretTracker {
+    sender: String,
+    path: String,
+    /// A password field — caret moves must never echo its characters.
+    password: bool,
+    /// Last known caret offset; `None` until the first event after focus (the baseline).
+    last: Option<i32>,
+}
+
+/// AT-SPI `TextBoundaryType` granularities for `get_text_at_offset`.
+const GRAN_CHAR: u32 = 0;
+const GRAN_WORD_START: u32 = 1;
+const GRAN_LINE_START: u32 = 5;
+
+/// Read the text to announce for a caret move from `last` to `new`: the single character
+/// traversed on a one-step move, otherwise the word at the caret (falling back to the line).
+/// Caching is **off** (per-method `Get`, never `GetAll` — see issue #6).
+async fn read_caret_text(
+    conn: &AccessibilityConnection,
+    ev: &TextCaretMovedEvent,
+    last: i32,
+    new: i32,
+) -> Option<String> {
+    let proxy = TextProxy::builder(conn.connection())
+        .destination(ev.sender())
+        .ok()?
+        .path(ev.path())
+        .ok()?
+        .cache_properties(zbus::proxy::CacheProperties::No)
+        .build()
+        .await
+        .ok()?;
+    match new - last {
+        1 => {
+            let (s, _, _) = proxy
+                .get_text_at_offset((new - 1).max(0), GRAN_CHAR)
+                .await
+                .ok()?;
+            Some(speak_char(&s))
+        }
+        -1 => {
+            let (s, _, _) = proxy.get_text_at_offset(new.max(0), GRAN_CHAR).await.ok()?;
+            Some(speak_char(&s))
+        }
+        _ => {
+            let (word, _, _) = proxy
+                .get_text_at_offset(new.max(0), GRAN_WORD_START)
+                .await
+                .ok()?;
+            if let Some(spoken) = clean_text(&word) {
+                return Some(spoken);
+            }
+            let (line, _, _) = proxy
+                .get_text_at_offset(new.max(0), GRAN_LINE_START)
+                .await
+                .ok()?;
+            clean_text(&line)
+        }
+    }
+}
+
+/// Spoken form of a single traversed character: whitespace becomes a word; other characters
+/// are announced as-is.
+fn speak_char(s: &str) -> String {
+    match s {
+        " " => "space".to_owned(),
+        "\t" => "tab".to_owned(),
+        "\n" | "\r\n" | "\r" => "new line".to_owned(),
+        "" => "blank".to_owned(),
+        other => other.to_owned(),
+    }
+}
+
 #[cfg(test)]
 mod value_format_tests {
-    use super::{clean_text, format_value};
+    use super::{clean_text, format_value, speak_char};
+
+    #[test]
+    fn speak_char_maps_whitespace_to_words() {
+        assert_eq!(speak_char("a"), "a");
+        assert_eq!(speak_char(" "), "space");
+        assert_eq!(speak_char("\t"), "tab");
+        assert_eq!(speak_char("\n"), "new line");
+        assert_eq!(speak_char(""), "blank");
+    }
 
     #[test]
     fn clean_text_trims_and_drops_empty() {
