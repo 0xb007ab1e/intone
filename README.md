@@ -119,7 +119,10 @@ at low verbosity.
 
 As you move the **caret** within a text field, oxeye announces the character you cross (or the
 word/line on a larger jump); **deleting** speaks the removed text, and **selecting** speaks the
-selected text (or a length for large selections) — but **never** within a password field. The role is treated as chrome
+selected text (or a length for large selections) — but **never** within a password field.
+
+Press **Ctrl+Alt+S** to hear a summary of the focused application's structure — e.g.
+*"3 headings, 12 buttons, 4 links"* — to get oriented in an unfamiliar window. The role is treated as chrome
 and appears from medium up; the accessible **description** and owning application are extra
 context spoken only at high.
 
