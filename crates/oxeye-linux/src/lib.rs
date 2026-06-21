@@ -21,6 +21,7 @@ use atspi::connection::AccessibilityConnection;
 use atspi::events::object::StateChangedEvent;
 use atspi::events::EventProperties;
 use atspi::proxy::accessible::AccessibleProxy;
+use atspi::proxy::text::TextProxy;
 use atspi::proxy::value::ValueProxy;
 use atspi::{Event, Interface, ObjectEvents, State, StateSet};
 use futures_lite::stream::StreamExt;
@@ -452,18 +453,30 @@ async fn read_focus(conn: &AccessibilityConnection, ev: &StateChangedEvent) -> R
     };
     // Description and state are best-effort: a failure degrades detail, not the announcement.
     let description = proxy.description().await.unwrap_or_default();
-    let states = match proxy.get_state().await {
-        Ok(set) => states_from(set),
+    let state_set = match proxy.get_state().await {
+        Ok(set) => set,
         Err(err) => {
             tracing::debug!(%err, %sender, %path, "get_state() failed");
-            announcement::States::default()
+            StateSet::default()
         }
     };
-    // Read a numeric value only when the object advertises the Value interface, so we never
-    // probe it on something that lacks it (correctness + avoids needless calls).
-    let value = match proxy.get_interfaces().await {
-        Ok(ifaces) if ifaces.contains(Interface::Value) => read_value(conn, ev).await,
-        _ => None,
+    let states = states_from(state_set);
+    // Surface a textual value, querying only interfaces the object advertises (never probing
+    // one it lacks). Numeric widgets use the Value interface; editable fields use the Text
+    // interface — but never a password field, and not whole multi-line documents.
+    let (has_value, has_text) = match proxy.get_interfaces().await {
+        Ok(ifaces) => (
+            ifaces.contains(Interface::Value),
+            ifaces.contains(Interface::Text),
+        ),
+        Err(_) => (false, false),
+    };
+    let value = if has_value {
+        read_value(conn, ev).await
+    } else if has_text && role != "password text" && !state_set.contains(State::MultiLine) {
+        read_text(conn, ev).await
+    } else {
+        None
     };
     let app = read_app_name(conn, &proxy).await;
     if name.is_empty() {
@@ -497,6 +510,40 @@ async fn read_value(conn: &AccessibilityConnection, ev: &StateChangedEvent) -> O
     current.is_finite().then(|| format_value(current))
 }
 
+/// Upper bound on text-field content read for an announcement, in characters. Single-line
+/// fields are short; this caps any pathological case and bounds the `GetText` call.
+const TEXT_CONTENT_MAX_CHARS: i32 = 200;
+
+/// Read editable text-field content via the AT-SPI Text interface, bounded in length. Caching
+/// is **off** (per-method `Get`, never `GetAll` — see issue #6). Best-effort: returns `None` on
+/// error or when empty. Callers must gate out password and multi-line fields first.
+async fn read_text(conn: &AccessibilityConnection, ev: &StateChangedEvent) -> Option<String> {
+    let proxy = TextProxy::builder(conn.connection())
+        .destination(ev.sender())
+        .ok()?
+        .path(ev.path())
+        .ok()?
+        .cache_properties(zbus::proxy::CacheProperties::No)
+        .build()
+        .await
+        .ok()?;
+    let count = proxy.character_count().await.ok()?;
+    if count <= 0 {
+        return None;
+    }
+    let raw = proxy
+        .get_text(0, count.min(TEXT_CONTENT_MAX_CHARS))
+        .await
+        .ok()?;
+    clean_text(&raw)
+}
+
+/// Trim text-field content for speech and drop it if there is nothing left.
+fn clean_text(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    (!trimmed.is_empty()).then(|| trimmed.to_owned())
+}
+
 /// Format an AT-SPI numeric value compactly: whole numbers without decimals, fractions trimmed
 /// of trailing zeros (e.g. `70.0 -> "70"`, `0.50 -> "0.5"`).
 fn format_value(value: f64) -> String {
@@ -513,7 +560,15 @@ fn format_value(value: f64) -> String {
 
 #[cfg(test)]
 mod value_format_tests {
-    use super::format_value;
+    use super::{clean_text, format_value};
+
+    #[test]
+    fn clean_text_trims_and_drops_empty() {
+        assert_eq!(clean_text("  hi  "), Some("hi".to_owned()));
+        assert_eq!(clean_text("John"), Some("John".to_owned()));
+        assert_eq!(clean_text("   "), None);
+        assert_eq!(clean_text(""), None);
+    }
 
     #[test]
     fn whole_numbers_have_no_decimals() {
