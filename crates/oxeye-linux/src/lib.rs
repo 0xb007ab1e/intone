@@ -441,3 +441,48 @@ where
     tts.receive_message_id().await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod live_tests {
+    use super::setup_keyboard;
+
+    /// Live registration check for the KWin `KeyboardMonitor` grab. Auto-skips unless a
+    /// session bus *and* the a11y `KeyboardMonitor` provider are present, so it is a no-op in
+    /// CI/headless and only exercises `SetKeyGrabs` on a KWin/Wayland desktop. It tears the
+    /// grab down immediately so it doesn't disturb an interactive session.
+    #[tokio::test]
+    async fn keyboard_grab_registers_when_compositor_present() {
+        let Ok(session) = zbus::Connection::session().await else {
+            eprintln!("skipped: no session bus");
+            return;
+        };
+        let Ok(dbus) = zbus::fdo::DBusProxy::new(&session).await else {
+            eprintln!("skipped: no DBus proxy");
+            return;
+        };
+        let name = match zbus::names::BusName::try_from("org.freedesktop.a11y.Manager") {
+            Ok(name) => name,
+            Err(_) => return,
+        };
+        if !dbus.name_has_owner(name).await.unwrap_or(false) {
+            eprintln!("skipped: no KWin KeyboardMonitor");
+            return;
+        }
+
+        let keyboard = setup_keyboard().await;
+        assert!(
+            keyboard.is_some(),
+            "setup_keyboard (claim name + watch + SetKeyGrabs) should succeed on a KWin session"
+        );
+
+        // Tear the grab/role down again so the test leaves no lasting state.
+        if let Some(kb) = keyboard {
+            let _ = kb.proxy.unwatch_keyboard().await;
+            let _ = kb
+                .session
+                .release_name("org.gnome.Orca.KeyboardMonitor")
+                .await;
+            let _ = kb.a11y_status.set_screen_reader_enabled(false).await;
+        }
+    }
+}
