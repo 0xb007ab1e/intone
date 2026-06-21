@@ -23,6 +23,7 @@ use atspi::events::object::{
 };
 use atspi::events::EventProperties;
 use atspi::proxy::accessible::AccessibleProxy;
+use atspi::proxy::cache::CacheProxy;
 use atspi::proxy::text::TextProxy;
 use atspi::proxy::value::ValueProxy;
 use atspi::{Event, Interface, ObjectEvents, Operation, State, StateSet};
@@ -34,6 +35,7 @@ use tokio::io::{AsyncBufRead, AsyncWrite};
 
 use oxeye_core::announcement;
 use oxeye_core::exclusions::{Context as ExclusionContext, ExclusionEngine};
+use oxeye_core::navigation;
 use oxeye_core::{Settings, Speech};
 
 /// X keysyms for the keys we react to.
@@ -43,6 +45,7 @@ const KEYSYM_ALT_L: u32 = 0xffe9;
 const KEYSYM_ALT_R: u32 = 0xffea;
 const KEYSYM_PAUSE: u32 = 0xff13;
 const KEYSYM_O: u32 = 0x6f;
+const KEYSYM_S: u32 = 0x73;
 
 /// X11 modifier-mask bits as reported in the `KeyEvent` `state` field.
 const MOD_CONTROL: u32 = 0x04;
@@ -187,14 +190,18 @@ async fn setup_keyboard() -> Option<Keyboard> {
         .ok()?;
     let proxy = KeyboardMonitorProxy::new(&session).await.ok()?;
     proxy.watch_keyboard().await.ok()?;
-    // Also grab a dedicated, *consumed* shortcut: Ctrl+Alt+O (won't reach the focused app).
+    // Grab dedicated, *consumed* shortcuts (won't reach the focused app): Ctrl+Alt+O (time)
+    // and Ctrl+Alt+S (announce the focused application's structure).
     let modifiers = vec![
         KEYSYM_CONTROL_L,
         KEYSYM_CONTROL_R,
         KEYSYM_ALT_L,
         KEYSYM_ALT_R,
     ];
-    let grabs = vec![(KEYSYM_O, MOD_CONTROL | MOD_ALT)];
+    let grabs = vec![
+        (KEYSYM_O, MOD_CONTROL | MOD_ALT),
+        (KEYSYM_S, MOD_CONTROL | MOD_ALT),
+    ];
     let _ = proxy.set_key_grabs(modifiers, grabs).await;
     Some(Keyboard {
         session,
@@ -268,6 +275,8 @@ pub async fn run() -> Result<()> {
 
     let mut last_text: Option<String> = None;
     let mut caret: Option<CaretTracker> = None;
+    // Bus name of the most recently focused application, for the structure-summary hotkey.
+    let mut focused_app: Option<String> = None;
 
     loop {
         tokio::select! {
@@ -285,6 +294,7 @@ pub async fn run() -> Result<()> {
                                 continue;
                             }
                         };
+                        focused_app = Some(state.sender().to_string());
                         // Track the caret for editable text objects, remembering whether it is a
                         // password field so caret moves there never echo characters.
                         caret = focused.has_text.then(|| CaretTracker {
@@ -409,6 +419,15 @@ pub async fn run() -> Result<()> {
                         speaker
                             .announce(&format!("time, {}", current_time()), true)
                             .await;
+                    }
+                    KEYSYM_S if has_ctrl_alt(args.state) => {
+                        let summary = match &focused_app {
+                            Some(app) => summarize_structure(&conn, app).await,
+                            None => None,
+                        };
+                        let text = summary
+                            .unwrap_or_else(|| "no structure to summarize".to_owned());
+                        speaker.announce(&text, true).await;
                     }
                     _ => {}
                 }
@@ -767,6 +786,24 @@ async fn read_selection(
         text: format_selection(&selected, length),
         caret,
     })
+}
+
+/// Summarise the focused application's structure via the AT-SPI Cache — one `GetItems` call
+/// returns the whole tree (role + name), so there is no per-node walk. Caching is **off**;
+/// returns `None` if the cache is unavailable or nothing notable is present.
+async fn summarize_structure(conn: &AccessibilityConnection, app: &str) -> Option<String> {
+    let cache = CacheProxy::builder(conn.connection())
+        .destination(app)
+        .ok()?
+        .cache_properties(zbus::proxy::CacheProperties::No)
+        .build()
+        .await
+        .ok()?;
+    let items = cache.get_items().await.ok()?;
+    let categories = items
+        .iter()
+        .map(|item| navigation::classify(item.role.name()));
+    navigation::summarize(categories)
 }
 
 /// Spoken form of a selection: the trimmed selected text plus "selected", or a length summary

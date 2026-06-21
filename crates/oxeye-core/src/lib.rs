@@ -17,6 +17,7 @@
 pub mod announcement;
 pub mod error;
 pub mod exclusions;
+pub mod navigation;
 pub mod redaction;
 pub mod settings;
 pub mod untrusted;
