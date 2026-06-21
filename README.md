@@ -112,8 +112,10 @@ oxeye config verbosity high        # adds description + owning application
 ```
 
 Notable **states** are always spoken (e.g. *checked* / *not checked*, *expanded* / *collapsed*,
-*selected*, *dimmed*, *required*, *has popup*), as is a widget's **value** when available —
-these carry meaning, so they aren't trimmed even at low verbosity. The role is treated as chrome
+*selected*, *dimmed*, *required*, *has popup*), as is a widget's **value** when available — a
+slider's number or a single-line text field's content (**never a password field's**, and
+multi-line documents aren't dumped on focus). These carry meaning, so they aren't trimmed even
+at low verbosity. The role is treated as chrome
 and appears from medium up; the accessible **description** and owning application are extra
 context spoken only at high.
 
