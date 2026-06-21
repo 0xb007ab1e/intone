@@ -83,13 +83,21 @@ struct Speaker {
 }
 
 impl Speaker {
-    /// Announce `text`, interrupting any in-progress speech.
-    async fn announce(&mut self, text: &str) {
+    /// Announce `text`. When `interrupt` is true (the normal case) any in-progress speech is
+    /// cancelled first; when false (a `LowerPriority` exclusion) the announcement is appended
+    /// without cutting off what is already being spoken.
+    async fn announce(&mut self, text: &str, interrupt: bool) {
         if self.mode.wants_text() {
-            println!("[say] {text}");
+            if interrupt {
+                println!("[say] {text}");
+            } else {
+                println!("[say:low] {text}");
+            }
         }
         if let Some(client) = self.client.as_mut() {
-            let _ = client.cancel(MessageScope::All).await;
+            if interrupt {
+                let _ = client.cancel(MessageScope::All).await;
+            }
             if let Err(err) = say(client, text).await {
                 tracing::debug!(%err, "speech failed");
             }
@@ -242,7 +250,7 @@ pub async fn run() -> Result<()> {
             SpeechMode::Both => "speech+text",
         }
     );
-    speaker.announce("oxeye spike running").await;
+    speaker.announce("oxeye spike running", true).await;
 
     let mut last_text: Option<String> = None;
 
@@ -264,12 +272,15 @@ pub async fn run() -> Result<()> {
                     }
                 };
                 let ctx = ExclusionContext { app: &app, role: &role, name: &name };
-                if exclusions.evaluate(&ctx) == Some(Action::Suppress) {
-                    continue;
-                }
-                let text = format!("{name}, {role}");
+                let full = format!("{name}, {role}");
+                let (text, interrupt) = match exclusions.evaluate(&ctx) {
+                    Some(Action::Suppress) => continue,
+                    Some(Action::Summarize) => (summarize(&name, &role), true),
+                    Some(Action::LowerPriority) => (full, false),
+                    None => (full, true),
+                };
                 last_text = Some(text.clone());
-                speaker.announce(&text).await;
+                speaker.announce(&text, interrupt).await;
             }
             Some(signal) = key_events.next() => {
                 let Ok(args) = signal.args() else { continue };
@@ -282,10 +293,12 @@ pub async fn run() -> Result<()> {
                         let text = last_text
                             .clone()
                             .unwrap_or_else(|| "nothing focused yet".to_owned());
-                        speaker.announce(&text).await;
+                        speaker.announce(&text, true).await;
                     }
                     KEYSYM_O if has_ctrl_alt(args.state) => {
-                        speaker.announce(&format!("time, {}", current_time())).await;
+                        speaker
+                            .announce(&format!("time, {}", current_time()), true)
+                            .await;
                     }
                     _ => {}
                 }
@@ -372,6 +385,49 @@ async fn apply_speech_settings(tts: &mut SsipClient, speech: &Speech) {
 /// Map a 0..=100 user setting onto SSIP's -100..=100 scale (50 -> 0, 100 -> +100).
 fn to_ssip_scale(value: u8) -> i8 {
     (i16::from(value) * 2 - 100).clamp(-100, 100) as i8
+}
+
+/// Shorten a chatty accessible name for a `Summarize` exclusion: take its first line and cap
+/// the length (on a char boundary), appending an ellipsis if it was truncated. Falls back to
+/// the role alone when the name is empty.
+fn summarize(name: &str, role: &str) -> String {
+    const MAX_CHARS: usize = 40;
+    let first_line = name.lines().next().unwrap_or(name).trim();
+    let mut short: String = first_line.chars().take(MAX_CHARS).collect();
+    if first_line.chars().count() > MAX_CHARS {
+        short.push('…');
+    }
+    if short.is_empty() {
+        role.to_owned()
+    } else {
+        format!("{short}, {role}")
+    }
+}
+
+#[cfg(test)]
+mod summarize_tests {
+    use super::summarize;
+
+    #[test]
+    fn keeps_short_first_line() {
+        assert_eq!(
+            summarize("Cookie consent\nmore detail", "banner"),
+            "Cookie consent, banner"
+        );
+    }
+
+    #[test]
+    fn truncates_long_names_with_ellipsis() {
+        let out = summarize(&"x".repeat(100), "banner");
+        assert!(out.ends_with(", banner"));
+        assert!(out.contains('…'), "truncation is marked");
+        assert!(out.chars().take_while(|&c| c == 'x').count() == 40);
+    }
+
+    #[test]
+    fn empty_name_falls_back_to_role() {
+        assert_eq!(summarize("   ", "statusbar"), "statusbar");
+    }
 }
 
 #[cfg(test)]

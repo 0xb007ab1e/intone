@@ -56,6 +56,7 @@ Do **not** statically link or vendor GPL code into the core.
 ```
 oxeye-core   — reusable, platform-agnostic: command model, settings, exclusions engine,
                verbosity/announcement policy, scripting host, speech/braille routing
+oxeye-cli    — `oxeye` command: manage configuration (exclusion rules) — platform-agnostic
 oxeye-linux  — AT-SPI2 tree reader + KWin a11y KeyboardMonitor input (Wayland verified);
                speech-dispatcher output
 (later) oxeye-windows (UIA), oxeye-macos (AXAPI)
@@ -77,3 +78,24 @@ OXEYE_SPEECH=text cargo run -p oxeye-linux    # print announcements (headless/re
 Developing remotely and want to *hear* it? Either use `OXEYE_SPEECH=text`, or route the audio
 to your machine over SSH/tailnet — see [`docs/remote-audio.md`](docs/remote-audio.md)
 (`scripts/remote-audio.sh` automates it).
+
+## Managing exclusions
+
+Exclusions tell the reader to ignore, shorten, or de-prioritise announcements from noisy apps,
+regions, or controls. Manage them with the `oxeye` command (writes the user config — no need to
+hand-edit TOML):
+
+```sh
+oxeye exclusions list
+oxeye exclusions add --app slack --action suppress              # silence an app
+oxeye exclusions add --name-regex '(?i)cookie' --role banner --action summarize
+oxeye exclusions add --role statusbar --action lower-priority   # speak, but don't interrupt
+oxeye exclusions remove 2                                       # by number from `list`
+oxeye exclusions path                                           # where the config lives
+```
+
+A rule matches when **all** its set fields match; the **first** matching rule wins. Actions:
+`suppress` (don't announce), `summarize` (first line, length-capped), `lower-priority`
+(announce without cutting off current speech). A rule with no matchers is rejected (it would
+match everything), and an invalid `--name-regex` fails closed without being saved. The rules are
+plain TOML — human-readable and shareable.

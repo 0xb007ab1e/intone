@@ -1,0 +1,21 @@
+[package]
+name = "oxeye-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Command-line configuration manager for the oxeye screen reader (exclusions, config)."
+
+# User-facing command is `oxeye`; the library holds the testable, disk-free logic.
+[[bin]]
+name = "oxeye"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+oxeye-core = { path = "../oxeye-core", version = "0.0.0" }
+clap = { workspace = true }
+anyhow = { workspace = true }
