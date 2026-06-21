@@ -14,6 +14,7 @@
 //! - never logs raw read content (see [`redaction`]),
 //! - performs no network I/O and emits no telemetry.
 
+pub mod announcement;
 pub mod error;
 pub mod exclusions;
 pub mod redaction;

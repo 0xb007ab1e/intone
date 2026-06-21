@@ -28,8 +28,9 @@ use ssip_client_async::tokio::AsyncClient;
 use ssip_client_async::{ClientError, ClientName, ClientScope, MessageScope};
 use tokio::io::{AsyncBufRead, AsyncWrite};
 
+use oxeye_core::announcement;
 use oxeye_core::exclusions::{Context as ExclusionContext, ExclusionEngine};
-use oxeye_core::{Action, Settings, Speech};
+use oxeye_core::{Settings, Speech};
 
 /// X keysyms for the keys we react to.
 const KEYSYM_CONTROL_L: u32 = 0xffe3;
@@ -272,15 +273,12 @@ pub async fn run() -> Result<()> {
                     }
                 };
                 let ctx = ExclusionContext { app: &app, role: &role, name: &name };
-                let full = format!("{name}, {role}");
-                let (text, interrupt) = match exclusions.evaluate(&ctx) {
-                    Some(Action::Suppress) => continue,
-                    Some(Action::Summarize) => (summarize(&name, &role), true),
-                    Some(Action::LowerPriority) => (full, false),
-                    None => (full, true),
+                let action = exclusions.evaluate(&ctx);
+                let Some(ann) = announcement::compose(&ctx, settings.verbosity, action) else {
+                    continue; // suppressed by an exclusion rule
                 };
-                last_text = Some(text.clone());
-                speaker.announce(&text, interrupt).await;
+                last_text = Some(ann.text.clone());
+                speaker.announce(&ann.text, ann.interrupt).await;
             }
             Some(signal) = key_events.next() => {
                 let Ok(args) = signal.args() else { continue };
@@ -385,49 +383,6 @@ async fn apply_speech_settings(tts: &mut SsipClient, speech: &Speech) {
 /// Map a 0..=100 user setting onto SSIP's -100..=100 scale (50 -> 0, 100 -> +100).
 fn to_ssip_scale(value: u8) -> i8 {
     (i16::from(value) * 2 - 100).clamp(-100, 100) as i8
-}
-
-/// Shorten a chatty accessible name for a `Summarize` exclusion: take its first line and cap
-/// the length (on a char boundary), appending an ellipsis if it was truncated. Falls back to
-/// the role alone when the name is empty.
-fn summarize(name: &str, role: &str) -> String {
-    const MAX_CHARS: usize = 40;
-    let first_line = name.lines().next().unwrap_or(name).trim();
-    let mut short: String = first_line.chars().take(MAX_CHARS).collect();
-    if first_line.chars().count() > MAX_CHARS {
-        short.push('…');
-    }
-    if short.is_empty() {
-        role.to_owned()
-    } else {
-        format!("{short}, {role}")
-    }
-}
-
-#[cfg(test)]
-mod summarize_tests {
-    use super::summarize;
-
-    #[test]
-    fn keeps_short_first_line() {
-        assert_eq!(
-            summarize("Cookie consent\nmore detail", "banner"),
-            "Cookie consent, banner"
-        );
-    }
-
-    #[test]
-    fn truncates_long_names_with_ellipsis() {
-        let out = summarize(&"x".repeat(100), "banner");
-        assert!(out.ends_with(", banner"));
-        assert!(out.contains('…'), "truncation is marked");
-        assert!(out.chars().take_while(|&c| c == 'x').count() == 40);
-    }
-
-    #[test]
-    fn empty_name_falls_back_to_role() {
-        assert_eq!(summarize("   ", "statusbar"), "statusbar");
-    }
 }
 
 #[cfg(test)]

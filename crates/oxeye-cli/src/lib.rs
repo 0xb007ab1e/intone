@@ -6,7 +6,7 @@
 //! free of any CLI dependency.
 
 use anyhow::{ensure, Context, Result};
-use oxeye_core::{Action, ExclusionEngine, ExclusionRule, Settings};
+use oxeye_core::{Action, ExclusionEngine, ExclusionRule, Settings, Verbosity};
 
 /// Add `rule` to `settings`, validating it first. Fails **closed**.
 ///
@@ -79,6 +79,31 @@ pub fn action_label(action: Action) -> &'static str {
         Action::Summarize => "summarize",
         Action::LowerPriority => "lower-priority",
     }
+}
+
+/// Stable, lowercase label for a [`Verbosity`] level (matches the CLI value names).
+#[must_use]
+pub fn verbosity_label(verbosity: Verbosity) -> &'static str {
+    match verbosity {
+        Verbosity::Low => "low",
+        Verbosity::Medium => "medium",
+        Verbosity::High => "high",
+    }
+}
+
+/// A short, human-readable summary of the current configuration.
+#[must_use]
+pub fn format_config(settings: &Settings) -> String {
+    let network = if settings.allow_network {
+        "allowed"
+    } else {
+        "off"
+    };
+    format!(
+        "verbosity: {}\nnetwork: {network}\nexclusion rules: {}",
+        verbosity_label(settings.verbosity),
+        settings.exclusions.len(),
+    )
 }
 
 #[cfg(test)]
@@ -155,5 +180,23 @@ mod tests {
         assert_eq!(action_label(Action::Suppress), "suppress");
         assert_eq!(action_label(Action::Summarize), "summarize");
         assert_eq!(action_label(Action::LowerPriority), "lower-priority");
+    }
+
+    #[test]
+    fn verbosity_labels_are_stable() {
+        use oxeye_core::Verbosity;
+        assert_eq!(super::verbosity_label(Verbosity::Low), "low");
+        assert_eq!(super::verbosity_label(Verbosity::Medium), "medium");
+        assert_eq!(super::verbosity_label(Verbosity::High), "high");
+    }
+
+    #[test]
+    fn config_summary_reports_verbosity_and_counts() {
+        let mut s = Settings::default();
+        add_rule(&mut s, rule(Some("a"), None, Action::Suppress)).unwrap();
+        let out = super::format_config(&s);
+        assert!(out.contains("verbosity: medium"), "default verbosity");
+        assert!(out.contains("network: off"), "network off by default");
+        assert!(out.contains("exclusion rules: 1"));
     }
 }
