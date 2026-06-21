@@ -99,3 +99,17 @@ A rule matches when **all** its set fields match; the **first** matching rule wi
 (announce without cutting off current speech). A rule with no matchers is rejected (it would
 match everything), and an invalid `--name-regex` fails closed without being saved. The rules are
 plain TOML — human-readable and shareable.
+
+## Verbosity
+
+How much detail the reader speaks for each focused element:
+
+```sh
+oxeye config show                  # current verbosity / network / rule count
+oxeye config verbosity low         # essential label only
+oxeye config verbosity medium      # "name, role" (default)
+oxeye config verbosity high        # "name, role, application"
+```
+
+`summarize`/`lower-priority` exclusion rules compose with verbosity (a `summarize` rule always
+shortens; `lower-priority` keeps the verbosity-appropriate text but doesn't interrupt).

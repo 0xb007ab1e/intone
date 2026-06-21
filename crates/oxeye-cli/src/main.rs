@@ -7,7 +7,7 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
-use oxeye_core::{Action, ExclusionRule, Settings};
+use oxeye_core::{Action, ExclusionRule, Settings, Verbosity};
 
 /// Configure the oxeye screen reader.
 #[derive(Parser)]
@@ -24,6 +24,43 @@ enum Command {
         #[command(subcommand)]
         command: ExclusionsCommand,
     },
+    /// View or change general configuration.
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfigCommand {
+    /// Show the current configuration.
+    Show,
+    /// Set the default announcement verbosity.
+    Verbosity {
+        /// How much detail to announce.
+        level: VerbosityArg,
+    },
+}
+
+/// CLI mirror of [`oxeye_core::Verbosity`].
+#[derive(Clone, Copy, ValueEnum)]
+enum VerbosityArg {
+    /// Just the essential label.
+    Low,
+    /// Label and role (the default).
+    Medium,
+    /// Label, role, and owning application.
+    High,
+}
+
+impl From<VerbosityArg> for Verbosity {
+    fn from(arg: VerbosityArg) -> Self {
+        match arg {
+            VerbosityArg::Low => Self::Low,
+            VerbosityArg::Medium => Self::Medium,
+            VerbosityArg::High => Self::High,
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -78,7 +115,28 @@ impl From<ActionArg> for Action {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Exclusions { command } => run_exclusions(command),
+        Command::Config { command } => run_config(command),
     }
+}
+
+/// Dispatch a `config` subcommand: show or change general settings.
+fn run_config(command: ConfigCommand) -> Result<()> {
+    match command {
+        ConfigCommand::Show => {
+            let settings = Settings::load().context("loading settings")?;
+            println!("{}", oxeye_cli::format_config(&settings));
+        }
+        ConfigCommand::Verbosity { level } => {
+            let mut settings = Settings::load().context("loading settings")?;
+            settings.verbosity = level.into();
+            settings.save().context("saving settings")?;
+            println!(
+                "verbosity set to {}",
+                oxeye_cli::verbosity_label(settings.verbosity)
+            );
+        }
+    }
+    Ok(())
 }
 
 /// Dispatch an `exclusions` subcommand: load settings, mutate, persist, and report.
