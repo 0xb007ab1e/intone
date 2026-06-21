@@ -33,30 +33,56 @@ impl Default for Verbosity {
 
 /// User-configurable settings.
 ///
-/// Scalar fields are declared before the `exclusions` array so the value serialises to
-/// valid TOML (values must precede tables/arrays-of-tables).
+/// Speech output settings, applied to the speech engine by the platform back-end.
+/// `rate`/`pitch`/`volume` are 0–100 (50 = normal; volume 100 = full).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
+pub struct Speech {
+    /// Speaking rate, 0–100 (50 = normal).
+    pub rate: u8,
+    /// Voice pitch, 0–100 (50 = normal).
+    pub pitch: u8,
+    /// Volume, 0–100 (100 = full).
+    pub volume: u8,
+    /// Synthesis voice name (engine-specific); `None` = engine default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub voice: Option<String>,
+    /// Language tag, e.g. `"en"` (BCP-47); `None` = engine default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    /// speech-dispatcher output module, e.g. `"espeak-ng"`; `None` = daemon default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_module: Option<String>,
+}
+
+impl Default for Speech {
+    fn default() -> Self {
+        Self {
+            rate: 50,
+            pitch: 50,
+            volume: 100,
+            voice: None,
+            language: None,
+            output_module: None,
+        }
+    }
+}
+
+/// Scalar fields are declared before the `[speech]` table and `exclusions` array so the value
+/// serialises to valid TOML (values must precede tables/arrays-of-tables).
+///
+/// `Default` is derived: network off, [`Verbosity::Medium`], [`Speech`] defaults, no exclusions.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Settings {
-    /// Speech rate, 0–100 (engine-relative).
-    pub speech_rate: u8,
     /// Default verbosity.
     pub verbosity: Verbosity,
     /// Whether any network feature is permitted. **Off by default** (no tracking).
     pub allow_network: bool,
+    /// Speech output settings (rate, pitch, volume, voice, …).
+    pub speech: Speech,
     /// User-defined exclusion rules.
     pub exclusions: Vec<ExclusionRule>,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            speech_rate: 50,
-            verbosity: Verbosity::default(),
-            allow_network: false,
-            exclusions: Vec::new(),
-        }
-    }
 }
 
 impl Settings {
@@ -159,7 +185,8 @@ mod tests {
         let s = Settings::default();
         let text = toml::to_string_pretty(&s).unwrap();
         let back: Settings = toml::from_str(&text).unwrap();
-        assert_eq!(back.speech_rate, s.speech_rate);
+        assert_eq!(back.speech.rate, s.speech.rate);
+        assert_eq!(back.speech.volume, s.speech.volume);
         assert_eq!(back.allow_network, s.allow_network);
         assert_eq!(back.verbosity, s.verbosity);
     }

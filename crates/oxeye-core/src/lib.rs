@@ -22,5 +22,5 @@ pub mod untrusted;
 
 pub use error::{Error, Result};
 pub use exclusions::{Action, Context, ExclusionEngine, ExclusionRule};
-pub use settings::{Settings, Verbosity};
+pub use settings::{Settings, Speech, Verbosity};
 pub use untrusted::Untrusted;
