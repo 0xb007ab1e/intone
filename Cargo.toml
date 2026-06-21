@@ -4,7 +4,7 @@
 # below, so the project builds on the distro toolchain (Debian 13 / Parrot ships rustc 1.85)
 # without forcing contributors onto rustup or pinning deps by hand.
 resolver = "3"
-members = ["crates/oxeye-core", "crates/oxeye-linux"]
+members = ["crates/oxeye-core", "crates/oxeye-cli", "crates/oxeye-linux"]
 
 [workspace.package]
 version = "0.0.0"
@@ -31,4 +31,6 @@ regex = "1"            # linear-time engine -> ReDoS-safe for user-supplied rule
 thiserror = "2"
 directories = "5"      # XDG base dirs
 tracing = "0.1"
+clap = { version = "4", features = ["derive"] }   # CLI arg parsing (config/exclusions mgmt)
+anyhow = "1"           # ergonomic error context at binary boundaries
 zeroize = { version = "1", features = ["derive"] }
