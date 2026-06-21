@@ -140,6 +140,34 @@ trait A11yStatus {
     fn set_is_enabled(&self, value: bool) -> zbus::Result<()>;
 }
 
+/// Session-bus pieces needed for hotkeys, kept alive for the run and for clean shutdown.
+struct Keyboard {
+    session: zbus::Connection,
+    a11y_status: A11yStatusProxy<'static>,
+    proxy: KeyboardMonitorProxy<'static>,
+}
+
+/// Best-effort hotkey setup: declare a screen reader is active, claim the well-known name
+/// KWin requires, and start watching keys. Returns `None` (rather than erroring) when the
+/// compositor doesn't provide `KeyboardMonitor`, so focus readout still works on non-KWin
+/// or headless sessions.
+async fn setup_keyboard() -> Option<Keyboard> {
+    let session = zbus::Connection::session().await.ok()?;
+    let a11y_status = A11yStatusProxy::new(&session).await.ok()?;
+    let _ = a11y_status.set_is_enabled(true).await;
+    let _ = a11y_status.set_screen_reader_enabled(true).await;
+    // KWin 6.3.x authorises KeyboardMonitor *only* for the owner of Orca's well-known name
+    // (hardcoded in `a11ykeyboardmonitor.cpp`).
+    session.request_name("org.gnome.Orca.KeyboardMonitor").await.ok()?;
+    let proxy = KeyboardMonitorProxy::new(&session).await.ok()?;
+    proxy.watch_keyboard().await.ok()?;
+    Some(Keyboard {
+        session,
+        a11y_status,
+        proxy,
+    })
+}
+
 /// Run the Linux screen-reader back-end: connect AT-SPI, speech, and hotkeys, then loop
 /// until interrupted. The `oxeye-linux` binary sets up the async runtime and calls this.
 pub async fn run() -> Result<()> {
@@ -167,31 +195,22 @@ pub async fn run() -> Result<()> {
     let atspi_events = conn.event_stream();
     futures_lite::pin!(atspi_events);
 
-    // Hotkeys: KWin's a11y KeyboardMonitor on the session bus.
-    let session = zbus::Connection::session()
-        .await
-        .context("connecting to the session bus")?;
-    let a11y_status = A11yStatusProxy::new(&session)
-        .await
-        .context("connecting to org.a11y.Status")?;
-    let _ = a11y_status.set_is_enabled(true).await;
-    let _ = a11y_status.set_screen_reader_enabled(true).await;
-    // KWin 6.3.x authorises KeyboardMonitor *only* for the owner of Orca's well-known name
-    // (hardcoded in `a11ykeyboardmonitor.cpp`), so claim it on this connection first.
-    // (TODO: drop once KWin generalises the check; release the name + reset flags on exit.)
-    session
-        .request_name("org.gnome.Orca.KeyboardMonitor")
-        .await
-        .context("claiming the screen-reader D-Bus name KWin requires for KeyboardMonitor")?;
-    let keyboard = KeyboardMonitorProxy::new(&session)
-        .await
-        .context("connecting to KWin's a11y KeyboardMonitor")?;
-    keyboard
-        .watch_keyboard()
-        .await
-        .context("starting keyboard watch (is this a KWin/Wayland session?)")?;
-    let key_events = keyboard.receive_key_event().await?;
-    futures_lite::pin!(key_events);
+    // Hotkeys are best-effort: if the compositor doesn't offer KeyboardMonitor (non-KWin,
+    // headless, or unauthorised), continue with focus readout only — essential for
+    // OXEYE_SPEECH=text on machines without a KWin/Wayland session.
+    let keyboard = setup_keyboard().await;
+    if keyboard.is_none() {
+        tracing::warn!(
+            "hotkeys unavailable (no KWin KeyboardMonitor); continuing with focus readout only"
+        );
+    }
+    let mut key_events: std::pin::Pin<Box<dyn futures_lite::stream::Stream<Item = KeyEvent> + '_>> =
+        match &keyboard {
+            Some(kb) => Box::pin(kb.proxy.receive_key_event().await?),
+            None => Box::pin(futures_lite::stream::pending()),
+        };
+    let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .context("installing SIGTERM handler")?;
 
     eprintln!(
         "oxeye spike ({}): Tab/Alt-Tab to hear focus · Control silences · Pause repeats · Ctrl-C quits.",
@@ -247,7 +266,11 @@ pub async fn run() -> Result<()> {
                 }
             }
             _ = tokio::signal::ctrl_c() => {
-                tracing::info!("shutting down: releasing screen-reader role");
+                tracing::info!("shutting down (SIGINT): releasing screen-reader role");
+                break;
+            }
+            _ = sigterm.recv() => {
+                tracing::info!("shutting down (SIGTERM): releasing screen-reader role");
                 break;
             }
             else => break,
@@ -256,9 +279,14 @@ pub async fn run() -> Result<()> {
 
     // Graceful shutdown: stop watching keys, release the Orca name, and clear the a11y
     // flags so the desktop doesn't stay in "screen reader active" state after we exit.
-    let _ = keyboard.unwatch_keyboard().await;
-    let _ = session.release_name("org.gnome.Orca.KeyboardMonitor").await;
-    let _ = a11y_status.set_screen_reader_enabled(false).await;
+    if let Some(kb) = &keyboard {
+        let _ = kb.proxy.unwatch_keyboard().await;
+        let _ = kb
+            .session
+            .release_name("org.gnome.Orca.KeyboardMonitor")
+            .await;
+        let _ = kb.a11y_status.set_screen_reader_enabled(false).await;
+    }
     speaker.silence().await;
 
     Ok(())
