@@ -1,0 +1,4 @@
+# Pin the toolchain for reproducible builds (std-supplychain). Update deliberately.
+[toolchain]
+channel = "1.85.0"
+components = ["rustfmt", "clippy"]

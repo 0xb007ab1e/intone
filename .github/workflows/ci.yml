@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read          # least privilege
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings" # treat warnings (incl. missing_docs) as errors
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4          # TODO: pin to a commit SHA (std-supplychain)
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features
+      - name: Test
+        run: cargo test --workspace --all-features
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4          # TODO: pin to a commit SHA
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Vulnerability audit
+        run: cargo install cargo-audit --locked && cargo audit
+      - name: License & dependency policy (deny.toml)
+        run: cargo install cargo-deny --locked && cargo deny check
+      - name: Third-party attribution (regenerated from deps, never fetched)
+        run: |
+          cargo install cargo-about --locked
+          # Requires about.toml + about.hbs; emits THIRD-PARTY-NOTICES.html.
+          cargo about generate about.hbs > THIRD-PARTY-NOTICES.html || \
+            echo "::warning::configure about.toml/about.hbs to enable attribution generation"
+      - name: SBOM (CycloneDX)
+        run: cargo install cargo-cyclonedx --locked && cargo cyclonedx --format json
+
+# TODO before first release: add secret scanning (e.g. gitleaks), sign artifacts +
+# provenance (cosign/SLSA), and pin every action by commit SHA.
