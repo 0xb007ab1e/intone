@@ -59,8 +59,14 @@ oxeye-core   — reusable, platform-agnostic: command model, settings, exclusion
 oxeye-cli    — `oxeye` command: manage configuration (exclusion rules) — platform-agnostic
 oxeye-linux  — AT-SPI2 tree reader + KWin a11y KeyboardMonitor input (Wayland verified);
                speech-dispatcher output
-(later) oxeye-windows (UIA), oxeye-macos (AXAPI)
+oxeye-windows — UI Automation (UIA) back-end (scaffold): focus reading via the shared core;
+               compiled in CI on a Windows runner (runtime needs a real desktop)
+(later) oxeye-macos (AXAPI)
 ```
+
+The Windows back-end reuses `oxeye-core`'s announcement/exclusions/navigation/braille policy
+**unchanged** — it only adapts the UIA tree, events, and output. That core reuse is the whole
+point of the core-first design.
 
 ## Verified target environment
 

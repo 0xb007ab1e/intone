@@ -4,7 +4,12 @@
 # below, so the project builds on the distro toolchain (Debian 13 / Parrot ships rustc 1.85)
 # without forcing contributors onto rustup or pinning deps by hand.
 resolver = "3"
-members = ["crates/oxeye-core", "crates/oxeye-cli", "crates/oxeye-linux"]
+members = [
+    "crates/oxeye-core",
+    "crates/oxeye-cli",
+    "crates/oxeye-linux",
+    "crates/oxeye-windows",
+]
 
 [workspace.package]
 version = "0.0.0"

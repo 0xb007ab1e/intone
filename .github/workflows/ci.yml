@@ -30,6 +30,18 @@ jobs:
       - name: Test
         run: cargo test --workspace --all-features
 
+  windows-build:
+    # Compiles the Windows/UIA back-end against the real Windows SDK — the portability proof
+    # that oxeye-core is reused unchanged. (Runtime behavior needs an actual Windows desktop.)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - name: Build Windows back-end
+        run: cargo build -p oxeye-windows
+      - name: Test Windows back-end
+        run: cargo test -p oxeye-windows
+
   supply-chain:
     runs-on: ubuntu-latest
     steps:
