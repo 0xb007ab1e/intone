@@ -92,13 +92,31 @@ impl SpeechMode {
     }
 }
 
-/// Output sink for announcements: text, speech, or both — plus optional braille rendering.
+/// A braille output channel. Adapters render an announcement's text however their transport
+/// needs; this port lets a physical-display adapter (BrlAPI) drop in beside the text sink.
+/// See `docs/braille-transport.md`.
+trait BrailleSink {
+    /// Present `text` on the braille channel.
+    fn show(&mut self, text: &str);
+}
+
+/// Braille sink that translates to uncontracted (Grade 1) cells and prints them — the dev/
+/// remote channel. A device sink (BrlAPI) would instead send the raw text and let BRLTTY
+/// translate; see `docs/braille-transport.md`.
+struct TextBrailleSink;
+
+impl BrailleSink for TextBrailleSink {
+    fn show(&mut self, text: &str) {
+        println!("[braille] {}", braille::to_braille(text));
+    }
+}
+
+/// Output sink for announcements: text, speech, or both — plus an optional braille sink.
 struct Speaker {
     mode: SpeechMode,
     client: Option<SsipClient>,
-    /// When set, each announcement is also rendered to braille (currently printed; device
-    /// output via BrlAPI is a follow-up).
-    braille: bool,
+    /// When set, each announcement is also presented on this braille channel.
+    braille: Option<Box<dyn BrailleSink>>,
 }
 
 impl Speaker {
@@ -113,8 +131,8 @@ impl Speaker {
                 println!("[say:low] {text}");
             }
         }
-        if self.braille {
-            println!("[braille] {}", braille::to_braille(text));
+        if let Some(sink) = self.braille.as_mut() {
+            sink.show(text);
         }
         if let Some(client) = self.client.as_mut() {
             if interrupt {
@@ -250,10 +268,13 @@ pub async fn run() -> Result<()> {
     } else {
         None
     };
+    let braille: Option<Box<dyn BrailleSink>> = settings
+        .braille
+        .then(|| Box::new(TextBrailleSink) as Box<dyn BrailleSink>);
     let mut speaker = Speaker {
         mode,
         client,
-        braille: settings.braille,
+        braille,
     };
 
     // Accessibility: subscribe to focus changes.
