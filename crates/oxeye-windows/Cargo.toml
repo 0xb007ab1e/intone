@@ -1,0 +1,32 @@
+[package]
+name = "oxeye-windows"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Windows (UI Automation) back-end for the oxeye screen reader."
+
+# This crate does NOT inherit the workspace `unsafe_code = "forbid"` lint: the UI Automation
+# COM API is an FFI boundary that requires `unsafe`. It is isolated to the `uia` adapter; the
+# reusable `oxeye-core` crate stays unsafe-free. The rest of the workspace lints are mirrored.
+[lints.rust]
+unsafe_code = "allow"
+missing_docs = "warn"
+unreachable_pub = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[dependencies]
+oxeye-core = { path = "../oxeye-core", version = "0.0.0" }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+
+# Windows-only: target-gated so it is not pulled into the Linux build/CI.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_UI_Accessibility",
+] }
