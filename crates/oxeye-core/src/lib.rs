@@ -15,6 +15,7 @@
 //! - performs no network I/O and emits no telemetry.
 
 pub mod announcement;
+pub mod braille;
 pub mod error;
 pub mod exclusions;
 pub mod navigation;

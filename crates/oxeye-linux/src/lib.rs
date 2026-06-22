@@ -36,6 +36,7 @@ use ssip_client_async::{ClientError, ClientName, ClientScope, MessageScope};
 use tokio::io::{AsyncBufRead, AsyncWrite};
 
 use oxeye_core::announcement;
+use oxeye_core::braille;
 use oxeye_core::exclusions::{Context as ExclusionContext, ExclusionEngine};
 use oxeye_core::navigation::{self, Direction, NavCategory};
 use oxeye_core::{Settings, Speech};
@@ -91,10 +92,13 @@ impl SpeechMode {
     }
 }
 
-/// Output sink for announcements: text, speech, or both.
+/// Output sink for announcements: text, speech, or both — plus optional braille rendering.
 struct Speaker {
     mode: SpeechMode,
     client: Option<SsipClient>,
+    /// When set, each announcement is also rendered to braille (currently printed; device
+    /// output via BrlAPI is a follow-up).
+    braille: bool,
 }
 
 impl Speaker {
@@ -108,6 +112,9 @@ impl Speaker {
             } else {
                 println!("[say:low] {text}");
             }
+        }
+        if self.braille {
+            println!("[braille] {}", braille::to_braille(text));
         }
         if let Some(client) = self.client.as_mut() {
             if interrupt {
@@ -243,7 +250,11 @@ pub async fn run() -> Result<()> {
     } else {
         None
     };
-    let mut speaker = Speaker { mode, client };
+    let mut speaker = Speaker {
+        mode,
+        client,
+        braille: settings.braille,
+    };
 
     // Accessibility: subscribe to focus changes.
     let conn = AccessibilityConnection::new()

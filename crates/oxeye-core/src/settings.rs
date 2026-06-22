@@ -82,6 +82,8 @@ pub struct Settings {
     pub verbosity: Verbosity,
     /// Whether any network feature is permitted. **Off by default** (no tracking).
     pub allow_network: bool,
+    /// Whether braille output is enabled. **Off by default.**
+    pub braille: bool,
     /// Speech output settings (rate, pitch, volume, voice, …).
     pub speech: Speech,
     /// User-defined exclusion rules.
@@ -191,6 +193,7 @@ mod tests {
         assert_eq!(back.speech.rate, s.speech.rate);
         assert_eq!(back.speech.volume, s.speech.volume);
         assert_eq!(back.allow_network, s.allow_network);
+        assert_eq!(back.braille, s.braille);
         assert_eq!(back.verbosity, s.verbosity);
     }
 }
