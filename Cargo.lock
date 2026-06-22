@@ -664,7 +664,7 @@ dependencies = [
 
 [[package]]
 name = "oxeye-cli"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -673,7 +673,7 @@ dependencies = [
 
 [[package]]
 name = "oxeye-core"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "directories",
  "regex",
@@ -686,7 +686,7 @@ dependencies = [
 
 [[package]]
 name = "oxeye-linux"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "atspi",
@@ -701,7 +701,7 @@ dependencies = [
 
 [[package]]
 name = "oxeye-windows"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "oxeye-core",
