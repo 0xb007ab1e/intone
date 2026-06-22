@@ -2,9 +2,11 @@
 //!
 //! Reads the focused element via the system-wide `AXUIElement` and hands it to [`oxeye_core`]
 //! for announcement composition — the same policy that drives the Linux and Windows back-ends.
-//! v1 **polls** the focused element and prints announcements (`[say] …`); AX notifications
-//! (`AXObserver`), speech (`AVSpeechSynthesizer`/`say`), and structured navigation are
-//! follow-ups. States (enabled/selected/expanded/checked) and the element's value are read here.
+//! v1 **polls** the focused element and speaks announcements via AVFoundation (see [`speech`]);
+//! AX notifications (`AXObserver`, to replace polling) and structured navigation are follow-ups.
+//! States (enabled/selected/expanded/checked) and the element's value are read here.
+//!
+//! [`speech`]: crate::speech
 //!
 //! AXAPI is a C/FFI boundary; `unsafe` is confined to this module, and each block carries a
 //! `// SAFETY:` justification (enforced by clippy's `undocumented_unsafe_blocks`).
@@ -23,9 +25,11 @@ use core_foundation::boolean::CFBoolean;
 use core_foundation::number::CFNumber;
 use core_foundation::string::CFString;
 use core_foundation_sys::base::CFTypeRef;
-use oxeye_core::announcement::{self, Element, States};
+use oxeye_core::announcement::{self, Announcement, Element, States};
 use oxeye_core::exclusions::{Context as AxContext, ExclusionEngine};
 use oxeye_core::{Settings, Verbosity};
+
+use crate::speech::Speaker;
 
 /// How often the focused element is polled (AX notifications are a follow-up).
 const POLL_INTERVAL: Duration = Duration::from_millis(150);
@@ -47,27 +51,29 @@ pub(crate) fn run() -> Result<()> {
     let exclusions = ExclusionEngine::compile(&settings.exclusions).unwrap_or_default();
     // SAFETY: create the system-wide accessibility element (owned for the process lifetime).
     let system = unsafe { AXUIElementCreateSystemWide() };
+    let speaker = Speaker::new();
 
-    eprintln!("oxeye-macos: reading focus (text output). Ctrl-C to quit.");
+    eprintln!("oxeye-macos: speaking focus changes. Ctrl-C to quit.");
     let mut last = String::new();
     loop {
-        if let Some(text) = read_focused(system, &exclusions, settings.verbosity) {
-            if text != last {
-                println!("[say] {text}");
-                last = text;
+        if let Some(ann) = read_focused(system, &exclusions, settings.verbosity) {
+            if ann.text != last {
+                tracing::debug!(text = %ann.text, interrupt = ann.interrupt, "say");
+                speaker.speak(&ann.text, ann.interrupt);
+                last = ann.text;
             }
         }
         std::thread::sleep(POLL_INTERVAL);
     }
 }
 
-/// Read the focused element's role and title and compose its announcement via the shared core
-/// policy. Returns `None` when there is no focus or an exclusion suppresses it.
+/// Read the focused element's role, states, and value and compose its announcement via the shared
+/// core policy. Returns `None` when there is no focus or an exclusion suppresses it.
 fn read_focused(
     system: AXUIElementRef,
     exclusions: &ExclusionEngine,
     verbosity: Verbosity,
-) -> Option<String> {
+) -> Option<Announcement> {
     let focused = copy_attribute(system, kAXFocusedUIElementAttribute)?;
     let focused_ref = focused.as_concrete_TypeRef() as AXUIElementRef;
     let role_id = copy_string(focused_ref, kAXRoleAttribute).unwrap_or_default();
@@ -88,7 +94,7 @@ fn read_focused(
         value: value.as_deref(),
         states,
     };
-    announcement::compose(&element, verbosity, action).map(|ann| ann.text)
+    announcement::compose(&element, verbosity, action)
 }
 
 /// Copy an AX attribute as an owned Core Foundation value, or `None` if absent.
