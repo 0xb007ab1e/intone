@@ -127,7 +127,14 @@ Press **Ctrl+Alt+S** to hear a summary of the focused application's structure �
 Move through it by element **type** with a virtual cursor (it starts wherever focus is):
 **Ctrl+Alt+H** next heading, **B** next button, **L** next link, **F** next form field — add
 **Shift** for the previous one. The target is announced (e.g. *"Save, button"*); at the end you
-hear *"no next button"*. The role is treated as chrome
+hear *"no next button"*.
+
+## Braille
+
+Enable braille with `oxeye config braille on`. Each announcement is then also translated to
+uncontracted (Grade 1) Unicode braille and emitted, e.g. `[braille] ⠓⠑⠇⠇⠕`. Contracted (Grade 2)
+braille and other languages via **liblouis**, and output to a physical display via **BrlAPI**,
+slot in behind this translation seam and are planned. The role is treated as chrome
 and appears from medium up; the accessible **description** and owning application are extra
 context spoken only at high.
 

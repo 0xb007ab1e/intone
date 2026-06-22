@@ -99,8 +99,9 @@ pub fn format_config(settings: &Settings) -> String {
     } else {
         "off"
     };
+    let braille = if settings.braille { "on" } else { "off" };
     format!(
-        "verbosity: {}\nnetwork: {network}\nexclusion rules: {}",
+        "verbosity: {}\nnetwork: {network}\nbraille: {braille}\nexclusion rules: {}",
         verbosity_label(settings.verbosity),
         settings.exclusions.len(),
     )
@@ -197,6 +198,7 @@ mod tests {
         let out = super::format_config(&s);
         assert!(out.contains("verbosity: medium"), "default verbosity");
         assert!(out.contains("network: off"), "network off by default");
+        assert!(out.contains("braille: off"), "braille off by default");
         assert!(out.contains("exclusion rules: 1"));
     }
 }

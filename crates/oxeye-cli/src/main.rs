@@ -40,6 +40,26 @@ enum ConfigCommand {
         /// How much detail to announce.
         level: VerbosityArg,
     },
+    /// Turn braille output on or off.
+    Braille {
+        /// Whether braille output is enabled.
+        state: Toggle,
+    },
+}
+
+/// An on/off switch for a boolean setting.
+#[derive(Clone, Copy, ValueEnum)]
+enum Toggle {
+    /// Enable the setting.
+    On,
+    /// Disable the setting.
+    Off,
+}
+
+impl From<Toggle> for bool {
+    fn from(toggle: Toggle) -> Self {
+        matches!(toggle, Toggle::On)
+    }
 }
 
 /// CLI mirror of [`oxeye_core::Verbosity`].
@@ -134,6 +154,12 @@ fn run_config(command: ConfigCommand) -> Result<()> {
                 "verbosity set to {}",
                 oxeye_cli::verbosity_label(settings.verbosity)
             );
+        }
+        ConfigCommand::Braille { state } => {
+            let mut settings = Settings::load().context("loading settings")?;
+            settings.braille = state.into();
+            settings.save().context("saving settings")?;
+            println!("braille {}", if settings.braille { "on" } else { "off" });
         }
     }
     Ok(())
