@@ -456,6 +456,12 @@ fn read_states(element: &IUIAutomationElement) -> States {
     if let Ok(enabled) = unsafe { element.CurrentIsEnabled() } {
         states.disabled = !enabled.as_bool();
     }
+    // SAFETY: read whether the field is required for form completion.
+    if let Ok(required) = unsafe { element.CurrentIsRequiredForForm() } {
+        states.required = required.as_bool();
+    }
+    // `has_popup` is left unset: UIA has no direct accessor (it lives in the AriaProperties
+    // string, which would need parsing). A follow-up if it proves useful.
     if let Some(toggle) = pattern::<IUIAutomationTogglePattern>(element, UIA_TogglePatternId) {
         states.checkable = true;
         // SAFETY: read the toggle state of a checkable control.
