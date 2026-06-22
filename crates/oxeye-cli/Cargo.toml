@@ -16,6 +16,6 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
-oxeye-core = { path = "../oxeye-core", version = "0.0.0" }
+oxeye-core = { path = "../oxeye-core", version = "0.1.0" }
 clap = { workspace = true }
 anyhow = { workspace = true }

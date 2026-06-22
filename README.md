@@ -4,7 +4,8 @@
 > **privacy-respecting** screen reader — built core-first so the same engine carries
 > Linux → Windows → macOS.
 
-**Status:** pre-spike (feasibility verified). See [`FEASIBILITY.md`](FEASIBILITY.md) and
+**Status:** `0.1.0` — Linux (AT-SPI2) and Windows (UI Automation) back-ends on a shared Rust
+core. See the [`CHANGELOG`](CHANGELOG.md), [`FEASIBILITY.md`](FEASIBILITY.md), and
 [`LINUX-FIRST-PLAN.md`](LINUX-FIRST-PLAN.md).
 
 ## What makes it different
