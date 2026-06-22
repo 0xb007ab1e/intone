@@ -29,13 +29,17 @@ use windows::Win32::UI::Accessibility::{
     CUIAutomation, ExpandCollapseState_Expanded, ExpandCollapseState_LeafNode, IUIAutomation,
     IUIAutomationCacheRequest, IUIAutomationElement, IUIAutomationExpandCollapsePattern,
     IUIAutomationFocusChangedEventHandler, IUIAutomationFocusChangedEventHandler_Impl,
-    IUIAutomationSelectionItemPattern, IUIAutomationTogglePattern, ToggleState_On,
-    UIA_ButtonControlTypeId, UIA_CheckBoxControlTypeId, UIA_ComboBoxControlTypeId,
-    UIA_EditControlTypeId, UIA_ExpandCollapsePatternId, UIA_HyperlinkControlTypeId,
-    UIA_ListItemControlTypeId, UIA_MenuItemControlTypeId, UIA_RadioButtonControlTypeId,
-    UIA_SelectionItemPatternId, UIA_TabItemControlTypeId, UIA_TextControlTypeId,
-    UIA_TogglePatternId, UIA_CONTROLTYPE_ID, UIA_PATTERN_ID,
+    IUIAutomationRangeValuePattern, IUIAutomationSelectionItemPattern, IUIAutomationTogglePattern,
+    IUIAutomationValuePattern, ToggleState_On, UIA_ButtonControlTypeId, UIA_CheckBoxControlTypeId,
+    UIA_ComboBoxControlTypeId, UIA_EditControlTypeId, UIA_ExpandCollapsePatternId,
+    UIA_HyperlinkControlTypeId, UIA_ListItemControlTypeId, UIA_MenuItemControlTypeId,
+    UIA_RadioButtonControlTypeId, UIA_RangeValuePatternId, UIA_SelectionItemPatternId,
+    UIA_TabItemControlTypeId, UIA_TextControlTypeId, UIA_TogglePatternId, UIA_ValuePatternId,
+    UIA_CONTROLTYPE_ID, UIA_PATTERN_ID,
 };
+
+/// Upper bound on text value read for an announcement, to avoid dumping a whole document.
+const VALUE_MAX_CHARS: usize = 200;
 
 /// One announcement bound for the speech thread.
 struct Utterance {
@@ -196,15 +200,45 @@ fn describe(
         name: &name,
     };
     let states = read_states(element);
+    let value = read_value(element);
     let action = exclusions.evaluate(&ident);
     let element = Element {
         ident,
         description: "",
-        // Value (UIA Value/RangeValue patterns) is a follow-up.
-        value: None,
+        value: value.as_deref(),
         states,
     };
     announcement::compose(&element, verbosity, action)
+}
+
+/// Read a textual value for the element: numeric widgets (slider/spin/progress) via the
+/// RangeValue pattern, else editable content via the Value pattern — but **never** a password
+/// field. Bounded to [`VALUE_MAX_CHARS`]. Returns `None` when there is no value.
+fn read_value(element: &IUIAutomationElement) -> Option<String> {
+    if let Some(range) = pattern::<IUIAutomationRangeValuePattern>(element, UIA_RangeValuePatternId)
+    {
+        // SAFETY: read the numeric value of a range control.
+        if let Ok(number) = unsafe { range.CurrentValue() } {
+            if number.is_finite() {
+                return Some(announcement::format_value(number));
+            }
+        }
+    }
+    // SAFETY: never reveal a password field's content.
+    let is_password = unsafe { element.CurrentIsPassword() }
+        .map(|flag| flag.as_bool())
+        .unwrap_or(false);
+    if is_password {
+        return None;
+    }
+    let value = pattern::<IUIAutomationValuePattern>(element, UIA_ValuePatternId)?;
+    // SAFETY: read the control's textual value.
+    let text = unsafe { value.CurrentValue() }.ok()?.to_string();
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(trimmed.chars().take(VALUE_MAX_CHARS).collect())
 }
 
 /// Query a UIA control pattern, returning `None` when the element doesn't support it.

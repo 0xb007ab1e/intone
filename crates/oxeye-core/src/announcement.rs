@@ -116,6 +116,22 @@ fn describe(element: &Element<'_>, verbosity: Verbosity) -> String {
     parts.join(", ")
 }
 
+/// Format a numeric widget value compactly for speech: whole numbers without decimals,
+/// fractions trimmed of trailing zeros (e.g. `70.0 -> "70"`, `0.50 -> "0.5"`). Shared by the
+/// platform back-ends that read a numeric value (slider/spin/progress).
+#[must_use]
+pub fn format_value(value: f64) -> String {
+    if value.fract() == 0.0 {
+        format!("{value:.0}")
+    } else {
+        let formatted = format!("{value:.2}");
+        formatted
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_owned()
+    }
+}
+
 /// The spoken words for an element's notable states, in a stable order.
 fn state_words(states: States) -> Vec<String> {
     let mut words = Vec::new();
@@ -277,6 +293,17 @@ mod tests {
         assert!(ann.text.ends_with(", banner"));
         assert!(ann.text.contains('…'));
         assert!(ann.interrupt);
+    }
+
+    #[test]
+    fn format_value_is_compact() {
+        use super::format_value;
+        assert_eq!(format_value(70.0), "70");
+        assert_eq!(format_value(0.0), "0");
+        assert_eq!(format_value(-5.0), "-5");
+        assert_eq!(format_value(0.5), "0.5");
+        assert_eq!(format_value(3.25), "3.25");
+        assert_eq!(format_value(2.50), "2.5");
     }
 
     #[test]

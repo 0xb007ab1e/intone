@@ -702,7 +702,9 @@ async fn read_value(conn: &AccessibilityConnection, ev: &StateChangedEvent) -> O
         .await
         .ok()?;
     let current = proxy.current_value().await.ok()?;
-    current.is_finite().then(|| format_value(current))
+    current
+        .is_finite()
+        .then(|| announcement::format_value(current))
 }
 
 /// Upper bound on text-field content read for an announcement, in characters. Single-line
@@ -733,24 +735,13 @@ async fn read_text(conn: &AccessibilityConnection, ev: &StateChangedEvent) -> Op
     clean_text(&raw)
 }
 
+// Numeric value formatting lives in `oxeye_core::announcement::format_value` (shared with the
+// Windows back-end).
+
 /// Trim text-field content for speech and drop it if there is nothing left.
 fn clean_text(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     (!trimmed.is_empty()).then(|| trimmed.to_owned())
-}
-
-/// Format an AT-SPI numeric value compactly: whole numbers without decimals, fractions trimmed
-/// of trailing zeros (e.g. `70.0 -> "70"`, `0.50 -> "0.5"`).
-fn format_value(value: f64) -> String {
-    if value.fract() == 0.0 {
-        format!("{value:.0}")
-    } else {
-        let formatted = format!("{value:.2}");
-        formatted
-            .trim_end_matches('0')
-            .trim_end_matches('.')
-            .to_owned()
-    }
 }
 
 /// Tracks the caret in the currently focused editable text object so caret-moved events can
@@ -1001,7 +992,7 @@ fn speak_char(s: &str) -> String {
 
 #[cfg(test)]
 mod value_format_tests {
-    use super::{clean_text, describe_change, format_selection, format_value, speak_char};
+    use super::{clean_text, describe_change, format_selection, speak_char};
 
     #[test]
     fn format_selection_announces_text_or_count() {
@@ -1039,20 +1030,6 @@ mod value_format_tests {
         assert_eq!(clean_text("John"), Some("John".to_owned()));
         assert_eq!(clean_text("   "), None);
         assert_eq!(clean_text(""), None);
-    }
-
-    #[test]
-    fn whole_numbers_have_no_decimals() {
-        assert_eq!(format_value(70.0), "70");
-        assert_eq!(format_value(0.0), "0");
-        assert_eq!(format_value(-5.0), "-5");
-    }
-
-    #[test]
-    fn fractions_trim_trailing_zeros() {
-        assert_eq!(format_value(0.5), "0.5");
-        assert_eq!(format_value(3.25), "3.25");
-        assert_eq!(format_value(2.50), "2.5");
     }
 }
 
