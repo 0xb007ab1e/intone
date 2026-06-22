@@ -1,21 +1,26 @@
-//! The Windows **UI Automation** adapter.
+//! The Windows **UI Automation** adapter + **SAPI** speech output.
 //!
 //! Registers an `IUIAutomationFocusChangedEventHandler` (a COM event sink) and hands each
 //! focused element to [`oxeye_core`] for announcement composition — the same policy that drives
-//! the Linux back-end. v1 prints announcements (`[say] …`); SAPI speech, richer states, and
-//! structured navigation are follow-ups.
+//! the Linux back-end. Output is SAPI speech (`ISpVoice`) and/or text, chosen by `OXEYE_SPEECH`
+//! (`speech` default, `text`, or `both`).
 //!
-//! COM/UIA is an `unsafe` FFI boundary; it is confined to this module. We initialize a
-//! multi-threaded apartment (MTA): UIA invokes the handler on its own worker threads, so no
-//! window message pump is needed — the main thread simply keeps the registration alive.
+//! COM/UIA/SAPI are `unsafe` FFI boundaries, confined to this module. Two design points:
+//! - **MTA**: UIA invokes the focus handler on its own worker threads, so no window message
+//!   pump is needed; the main thread parks.
+//! - COM interface pointers are `!Send`/`!Sync`, but the focus handler is shared across UIA
+//!   threads. So the `ISpVoice` lives on a **dedicated speech thread**, fed over a `SyncSender`
+//!   (which is `Send + Sync`); the handler never touches the voice directly.
 
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::time::Duration;
 
 use anyhow::{Context as _, Result};
-use oxeye_core::announcement::{self, Element, States};
+use oxeye_core::announcement::{self, Announcement, Element, States};
 use oxeye_core::exclusions::{Context as UiaContext, ExclusionEngine};
 use oxeye_core::{Settings, Verbosity};
-use windows::core::implement;
+use windows::core::{implement, PCWSTR};
+use windows::Win32::Media::Speech::{ISpVoice, SpVoice, SPF_ASYNC, SPF_PURGEBEFORESPEAK};
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED,
 };
@@ -28,12 +33,48 @@ use windows::Win32::UI::Accessibility::{
     UIA_TextControlTypeId, UIA_CONTROLTYPE_ID,
 };
 
-/// A UI Automation focus-changed event sink. Holds the (read-only, `Sync`) policy state so it
-/// can announce from UIA's worker threads.
+/// One announcement bound for the speech thread.
+struct Utterance {
+    text: String,
+    /// Interrupt in-progress speech (purge the queue) vs. append.
+    interrupt: bool,
+}
+
+/// How announcements are emitted, chosen by the `OXEYE_SPEECH` environment variable.
+#[derive(Clone, Copy)]
+enum SpeechMode {
+    /// SAPI speech only (default).
+    Speech,
+    /// Print to stdout only (no audio) — for headless dev.
+    Text,
+    /// Both speak and print.
+    Both,
+}
+
+impl SpeechMode {
+    fn from_env() -> Self {
+        match std::env::var("OXEYE_SPEECH").as_deref() {
+            Ok("text") => Self::Text,
+            Ok("both") => Self::Both,
+            _ => Self::Speech,
+        }
+    }
+    fn wants_audio(self) -> bool {
+        matches!(self, Self::Speech | Self::Both)
+    }
+    fn wants_text(self) -> bool {
+        matches!(self, Self::Text | Self::Both)
+    }
+}
+
+/// A UI Automation focus-changed event sink. Holds read-only, `Sync` state so it can announce
+/// from UIA's worker threads; speech is delegated to a separate thread via `speech`.
 #[implement(IUIAutomationFocusChangedEventHandler)]
 struct FocusHandler {
     exclusions: ExclusionEngine,
     verbosity: Verbosity,
+    print: bool,
+    speech: Option<SyncSender<Utterance>>,
 }
 
 impl IUIAutomationFocusChangedEventHandler_Impl for FocusHandler_Impl {
@@ -42,8 +83,17 @@ impl IUIAutomationFocusChangedEventHandler_Impl for FocusHandler_Impl {
         sender: Option<&IUIAutomationElement>,
     ) -> windows::core::Result<()> {
         if let Some(element) = sender {
-            if let Some(text) = describe(element, &self.exclusions, self.verbosity) {
-                println!("[say] {text}");
+            if let Some(ann) = describe(element, &self.exclusions, self.verbosity) {
+                if self.print {
+                    println!("[say] {}", ann.text);
+                }
+                if let Some(tx) = &self.speech {
+                    // Never block a UIA worker thread: drop if the speech queue is full.
+                    let _ = tx.try_send(Utterance {
+                        text: ann.text,
+                        interrupt: ann.interrupt,
+                    });
+                }
             }
         }
         Ok(())
@@ -54,6 +104,7 @@ impl IUIAutomationFocusChangedEventHandler_Impl for FocusHandler_Impl {
 pub(crate) fn run() -> Result<()> {
     let settings = Settings::load().unwrap_or_default();
     let exclusions = ExclusionEngine::compile(&settings.exclusions).unwrap_or_default();
+    let mode = SpeechMode::from_env();
 
     // SAFETY: standard per-thread COM apartment initialization (MTA); released at exit.
     unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }
@@ -64,19 +115,57 @@ pub(crate) fn run() -> Result<()> {
         unsafe { CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER) }
             .context("creating the UI Automation client")?;
 
+    let speech = mode.wants_audio().then(spawn_speech_thread);
     let handler: IUIAutomationFocusChangedEventHandler = FocusHandler {
         exclusions,
         verbosity: settings.verbosity,
+        print: mode.wants_text(),
+        speech,
     }
     .into();
-    // SAFETY: register the sink; UIA invokes it on its own threads until removed/exit.
+    // SAFETY: register the sink; UIA invokes it on its own threads until exit.
     unsafe { automation.AddFocusChangedEventHandler(None::<&IUIAutomationCacheRequest>, &handler) }
         .context("AddFocusChangedEventHandler")?;
 
-    eprintln!("oxeye-windows: listening for focus changes (text output). Ctrl-C to quit.");
+    eprintln!("oxeye-windows: listening for focus changes. Ctrl-C to quit.");
     // The handler fires on UIA worker threads; keep this thread and the registration alive.
     loop {
         std::thread::sleep(Duration::from_secs(3600));
+    }
+}
+
+/// Spawn the speech thread (it owns the `!Send` `ISpVoice`) and return a sender to it.
+fn spawn_speech_thread() -> SyncSender<Utterance> {
+    let (tx, rx) = sync_channel::<Utterance>(32);
+    std::thread::spawn(move || speech_loop(&rx));
+    tx
+}
+
+/// Own a SAPI voice and speak each received utterance. Exits silently if SAPI is unavailable.
+fn speech_loop(rx: &Receiver<Utterance>) {
+    // SAFETY: COM init for this thread (MTA); the voice is created and used only here.
+    if unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.ok().is_err() {
+        return;
+    }
+    // SAFETY: create the SAPI voice via COM.
+    let voice: ISpVoice = match unsafe { CoCreateInstance(&SpVoice, None, CLSCTX_INPROC_SERVER) } {
+        Ok(voice) => voice,
+        Err(err) => {
+            tracing::warn!(%err, "SAPI voice unavailable; speech disabled");
+            return;
+        }
+    };
+    while let Ok(utterance) = rx.recv() {
+        let mut wide: Vec<u16> = utterance.text.encode_utf16().collect();
+        wide.push(0); // null-terminate
+        let mut flags = SPF_ASYNC.0 as u32;
+        if utterance.interrupt {
+            flags |= SPF_PURGEBEFORESPEAK.0 as u32;
+        }
+        // SAFETY: speak the null-terminated wide string; SAPI copies it before returning.
+        if let Err(err) = unsafe { voice.Speak(PCWSTR(wide.as_ptr()), flags, None) } {
+            tracing::debug!(%err, "SAPI Speak failed");
+        }
     }
 }
 
@@ -86,7 +175,7 @@ fn describe(
     element: &IUIAutomationElement,
     exclusions: &ExclusionEngine,
     verbosity: Verbosity,
-) -> Option<String> {
+) -> Option<Announcement> {
     // SAFETY: UIA COM calls reading the element's properties.
     let name = unsafe { element.CurrentName() }
         .map(|bstr| bstr.to_string())
@@ -107,7 +196,7 @@ fn describe(
         value: None,
         states: States::default(),
     };
-    announcement::compose(&element, verbosity, action).map(|announcement| announcement.text)
+    announcement::compose(&element, verbosity, action)
 }
 
 /// Map a UIA control type to a human-readable role label for announcements.
