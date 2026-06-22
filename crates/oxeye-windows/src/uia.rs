@@ -136,8 +136,8 @@ pub(crate) fn run() -> Result<()> {
     unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }
         .ok()
         .context("CoInitializeEx")?;
-    // SAFETY: create the UI Automation root object via COM.
     let automation: IUIAutomation =
+        // SAFETY: create the UI Automation root object via COM.
         unsafe { CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER) }
             .context("creating the UI Automation client")?;
 
