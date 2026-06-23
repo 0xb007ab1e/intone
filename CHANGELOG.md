@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Pre-1.0, the public API may change
 between minor versions.
 
+## [Unreleased]
+
+### Fixed
+
+- **`oxeye-linux`** — hotkey setup no longer registers Control/Alt as standalone grabbed
+  modifiers in KWin's `KeyboardMonitor.SetKeyGrabs`. KWin *consumes* any keysym in that list,
+  so it swallowed every Control/Alt press before the focused app saw it — locking out all
+  Ctrl/Alt shortcuts (Ctrl+C, Alt+Tab, VT switching). Only the dedicated `Ctrl+Alt+<letter>`
+  combos are grabbed now; bare Control still drives "silence" via pass-through.
+
 ## [0.1.0] — 2026-06-22
 
 First public release: a free, open-source, **privacy-respecting**, **cross-platform** screen
