@@ -45,6 +45,36 @@ enum ConfigCommand {
         /// Whether braille output is enabled.
         state: Toggle,
     },
+    /// Set the synthesis voice (engine-specific name; `default` reverts to the engine default).
+    Voice {
+        /// Voice name, or `default` to clear (list installed voices with `spd-say -L`).
+        name: String,
+    },
+    /// Set the speech-dispatcher output module (e.g. `espeak-ng`, `piper`; `default` to clear).
+    Module {
+        /// Output-module name, or `default` to clear.
+        name: String,
+    },
+    /// Set the speech language as a BCP-47 tag (e.g. `en`, `es`; `default` to clear).
+    Language {
+        /// Language tag, or `default` to clear.
+        tag: String,
+    },
+    /// Set the speaking rate (0–100; 50 = normal).
+    Rate {
+        /// Rate, 0–100.
+        value: u8,
+    },
+    /// Set the voice pitch (0–100; 50 = normal).
+    Pitch {
+        /// Pitch, 0–100.
+        value: u8,
+    },
+    /// Set the volume (0–100; 100 = full).
+    Volume {
+        /// Volume, 0–100.
+        value: u8,
+    },
 }
 
 /// An on/off switch for a boolean setting.
@@ -161,8 +191,52 @@ fn run_config(command: ConfigCommand) -> Result<()> {
             settings.save().context("saving settings")?;
             println!("braille {}", if settings.braille { "on" } else { "off" });
         }
+        ConfigCommand::Voice { name } => {
+            let mut settings = Settings::load().context("loading settings")?;
+            settings.speech.voice = oxeye_cli::optional_setting(&name);
+            settings.save().context("saving settings")?;
+            report_optional("voice", &settings.speech.voice);
+        }
+        ConfigCommand::Module { name } => {
+            let mut settings = Settings::load().context("loading settings")?;
+            settings.speech.output_module = oxeye_cli::optional_setting(&name);
+            settings.save().context("saving settings")?;
+            report_optional("output module", &settings.speech.output_module);
+        }
+        ConfigCommand::Language { tag } => {
+            let mut settings = Settings::load().context("loading settings")?;
+            settings.speech.language = oxeye_cli::optional_setting(&tag);
+            settings.save().context("saving settings")?;
+            report_optional("language", &settings.speech.language);
+        }
+        ConfigCommand::Rate { value } => {
+            let mut settings = Settings::load().context("loading settings")?;
+            settings.speech.rate = oxeye_cli::checked_level(value)?;
+            settings.save().context("saving settings")?;
+            println!("rate set to {}", settings.speech.rate);
+        }
+        ConfigCommand::Pitch { value } => {
+            let mut settings = Settings::load().context("loading settings")?;
+            settings.speech.pitch = oxeye_cli::checked_level(value)?;
+            settings.save().context("saving settings")?;
+            println!("pitch set to {}", settings.speech.pitch);
+        }
+        ConfigCommand::Volume { value } => {
+            let mut settings = Settings::load().context("loading settings")?;
+            settings.speech.volume = oxeye_cli::checked_level(value)?;
+            settings.save().context("saving settings")?;
+            println!("volume set to {}", settings.speech.volume);
+        }
     }
     Ok(())
+}
+
+/// Print the new value of an optional speech setting, showing `default` when it was cleared.
+fn report_optional(label: &str, value: &Option<String>) {
+    match value {
+        Some(v) => println!("{label} set to {v}"),
+        None => println!("{label} reset to engine default"),
+    }
 }
 
 /// Dispatch an `exclusions` subcommand: load settings, mutate, persist, and report.
