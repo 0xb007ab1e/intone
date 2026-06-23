@@ -57,8 +57,8 @@ The one missing piece (a speech engine) is a one-line install, not a design prob
 
 ## ✅ Phase-0 spike — working (2026-06-21)
 
-`crates/oxeye-linux` is a runnable spike proving the full seam on the target box (Parrot 7,
-KDE Plasma 6 / Wayland): **AT-SPI2 focus events → `oxeye-core` exclusions policy →
+`crates/intone-linux` is a runnable spike proving the full seam on the target box (Parrot 7,
+KDE Plasma 6 / Wayland): **AT-SPI2 focus events → `intone-core` exclusions policy →
 speech-dispatcher**. It speaks the name + role of each element as focus moves — the core
 screen-reader behaviour. Verified: compiles (MSRV-aware 1.85 graph; zbus 5.13.2), connects
 to the live a11y bus, registers for `StateChanged`/`focused` events, and drives speech.
@@ -66,14 +66,14 @@ to the live a11y bus, registers for `StateChanged`/`focused` events, and drives 
 Run it in a graphical KDE session (needs the a11y bus + audio):
 
 ```text
-cargo run -p oxeye-linux      # then Tab/Alt-Tab around and listen
+cargo run -p intone-linux      # then Tab/Alt-Tab around and listen
 ```
 
 Speech (increment #1, done): a **persistent SSIP connection** to speech-dispatcher with
 **interrupt-on-focus** (cancels the prior utterance the instant focus moves) and rate control
 from settings; **auto-spawns** the daemon if its socket is absent (the pure-Rust SSIP client,
 unlike libspeechd, doesn't). Pure Rust over the local socket — GPL TTS engines stay in their
-own process, keeping oxeye permissively licensed.
+own process, keeping intone permissively licensed.
 
 Hotkeys (increment #2, done): global keys via KWin's `org.freedesktop.a11y.KeyboardMonitor`
 (the sanctioned Wayland key path) — **Control silences** speech, **Pause repeats** the last
@@ -83,12 +83,12 @@ Keys are *watched* (pass-through), not grabbed.
 **Live-test findings (KWin 6.3.6, verified on the target):** (1) the SSIP daemon must be
 polled for, not waited-on with a fixed delay (cold start is slow); (2) KWin authorises
 `KeyboardMonitor` **only for the owner of the well-known name `org.gnome.Orca.KeyboardMonitor`**
-(hardcoded in `a11ykeyboardmonitor.cpp`) — oxeye must claim that name on the same connection
+(hardcoded in `a11ykeyboardmonitor.cpp`) — intone must claim that name on the same connection
 before `WatchKeyboard`. Also set `org.a11y.Status.ScreenReaderEnabled`. (3) the `atspi` proxy's **default property
 caching crashed Qt apps' a11y bridge** (a `GetAll` on build → SIGSEGV in the app) — fixed by
 `cache_properties(No)` (lazy reads). TODO: reset a11y flags + release the name on exit (SIGINT).
 
-**Headless/remote testing (done):** `OXEYE_SPEECH=text` prints announcements (no audio, no
+**Headless/remote testing (done):** `INTONE_SPEECH=text` prints announcements (no audio, no
 daemon) for remote dev over SSH/tmux; `scripts/test-readout.sh` launches test apps, captures
 the readout, and tears everything down (self-cleaning, no idle leftovers). **Verified reading
 real elements:** kdialog → `OK, button`. (kcalc opens focused on an unnamed panel → `, panel`;

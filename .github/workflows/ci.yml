@@ -32,7 +32,7 @@ jobs:
 
   windows-build:
     # Compiles the Windows/UIA back-end against the real Windows SDK — the portability proof
-    # that oxeye-core is reused unchanged. (Runtime behavior needs an actual Windows desktop.)
+    # that intone-core is reused unchanged. (Runtime behavior needs an actual Windows desktop.)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -42,13 +42,13 @@ jobs:
       # Clippy (which compiles) is the gate — it lints the real UIA code, including
       # `undocumented_unsafe_blocks` (every `unsafe` must be justified). RUSTFLAGS=-D warnings.
       - name: Clippy Windows back-end
-        run: cargo clippy -p oxeye-windows --all-targets
+        run: cargo clippy -p intone-windows --all-targets
       - name: Test Windows back-end
-        run: cargo test -p oxeye-windows
+        run: cargo test -p intone-windows
 
   macos-build:
     # Compiles the macOS/AXAPI back-end against the real Accessibility frameworks — the
-    # portability proof that oxeye-core is reused unchanged. The `ax` FFI adapter is
+    # portability proof that intone-core is reused unchanged. The `ax` FFI adapter is
     # `cfg(target_os = "macos")`, so only a macOS runner compiles it; the ubuntu/windows
     # jobs build the non-macOS stub. (Runtime behavior needs an actual macOS desktop +
     # the Accessibility permission.)
@@ -61,9 +61,9 @@ jobs:
       # Clippy (which compiles) is the gate — it lints the real AXAPI code, including
       # `undocumented_unsafe_blocks` (every `unsafe` must be justified). RUSTFLAGS=-D warnings.
       - name: Clippy macOS back-end
-        run: cargo clippy -p oxeye-macos --all-targets
+        run: cargo clippy -p intone-macos --all-targets
       - name: Test macOS back-end
-        run: cargo test -p oxeye-macos
+        run: cargo test -p intone-macos
 
   supply-chain:
     runs-on: ubuntu-latest

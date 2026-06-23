@@ -3,7 +3,7 @@
 //! Mirrors the native-speech approach of the Windows (SAPI `ISpVoice`) and Linux
 //! (speech-dispatcher) back-ends: a persistent synthesizer that speaks utterances asynchronously
 //! and can **interrupt** in-progress speech (barge-in) when a higher-priority announcement
-//! arrives — honoring [`oxeye_core::announcement::Announcement::interrupt`].
+//! arrives — honoring [`intone_core::announcement::Announcement::interrupt`].
 //!
 //! `AVSpeechSynthesizer` is an Objective-C object; the `unsafe` message sends are confined here,
 //! each with a `// SAFETY:` justification (enforced by clippy's `undocumented_unsafe_blocks`).

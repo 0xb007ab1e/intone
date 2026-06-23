@@ -1,9 +1,9 @@
-//! `oxeye-core` — platform-agnostic core of the **oxeye** screen reader.
+//! `intone-core` — platform-agnostic core of the **intone** screen reader.
 //!
 //! This crate holds everything that does **not** depend on a specific OS accessibility
 //! API: the [`settings`] model, the user-defined [`exclusions`] engine, [`redaction`] of
 //! sensitive content, and the [`untrusted`] trust-boundary wrapper for data read from the
-//! accessibility tree. Platform back-ends (`oxeye-linux`, and later Windows/macOS) depend
+//! accessibility tree. Platform back-ends (`intone-linux`, and later Windows/macOS) depend
 //! on this crate and feed it data.
 //!
 //! # Security posture

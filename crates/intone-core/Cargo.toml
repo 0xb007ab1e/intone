@@ -1,11 +1,11 @@
 [package]
-name = "oxeye-core"
+name = "intone-core"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Platform-agnostic core for the oxeye screen reader: settings, exclusions, redaction, trust-boundary handling."
+description = "Platform-agnostic core for the intone screen reader: settings, exclusions, redaction, trust-boundary handling."
 
 [lints]
 workspace = true

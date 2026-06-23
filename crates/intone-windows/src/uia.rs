@@ -1,8 +1,8 @@
 //! The Windows **UI Automation** adapter + **SAPI** speech output.
 //!
 //! Registers an `IUIAutomationFocusChangedEventHandler` (a COM event sink) and hands each
-//! focused element to [`oxeye_core`] for announcement composition — the same policy that drives
-//! the Linux back-end. Output is SAPI speech (`ISpVoice`) and/or text, chosen by `OXEYE_SPEECH`
+//! focused element to [`intone_core`] for announcement composition — the same policy that drives
+//! the Linux back-end. Output is SAPI speech (`ISpVoice`) and/or text, chosen by `INTONE_SPEECH`
 //! (`speech` default, `text`, or `both`).
 //!
 //! COM/UIA/SAPI are `unsafe` FFI boundaries, confined to this module. Two design points:
@@ -16,10 +16,10 @@ use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::Arc;
 
 use anyhow::{Context as _, Result};
-use oxeye_core::announcement::{self, Announcement, Element, States};
-use oxeye_core::exclusions::{Context as UiaContext, ExclusionEngine};
-use oxeye_core::navigation::{self, Direction, NavCategory};
-use oxeye_core::{Settings, Verbosity};
+use intone_core::announcement::{self, Announcement, Element, States};
+use intone_core::exclusions::{Context as UiaContext, ExclusionEngine};
+use intone_core::navigation::{self, Direction, NavCategory};
+use intone_core::{Settings, Verbosity};
 use windows::core::Interface;
 use windows::core::{implement, PCWSTR};
 use windows::Win32::Foundation::HWND;
@@ -61,7 +61,7 @@ struct Utterance {
     interrupt: bool,
 }
 
-/// How announcements are emitted, chosen by the `OXEYE_SPEECH` environment variable.
+/// How announcements are emitted, chosen by the `INTONE_SPEECH` environment variable.
 #[derive(Clone, Copy)]
 enum SpeechMode {
     /// SAPI speech only (default).
@@ -74,7 +74,7 @@ enum SpeechMode {
 
 impl SpeechMode {
     fn from_env() -> Self {
-        match std::env::var("OXEYE_SPEECH").as_deref() {
+        match std::env::var("INTONE_SPEECH").as_deref() {
             Ok("text") => Self::Text,
             Ok("both") => Self::Both,
             _ => Self::Speech,
@@ -155,7 +155,7 @@ pub(crate) fn run() -> Result<()> {
     register_hotkeys().context("RegisterHotKey")?;
 
     eprintln!(
-        "oxeye-windows: focus + Ctrl+Alt+{{H,B,L,F}} navigation (Shift = previous). Ctrl-C to quit."
+        "intone-windows: focus + Ctrl+Alt+{{H,B,L,F}} navigation (Shift = previous). Ctrl-C to quit."
     );
     // The focus sink fires on UIA worker threads; this thread pumps WM_HOTKEY for navigation.
     // The virtual cursor is thread-local here (no cross-thread COM sharing).

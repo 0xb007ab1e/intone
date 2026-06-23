@@ -1,6 +1,6 @@
 # Braille transport — design + validated BrlAPI protocol notes
 
-oxeye separates **braille translation** (pure, in `oxeye-core::braille`) from **braille
+intone separates **braille translation** (pure, in `intone-core::braille`) from **braille
 transport** (how cells/text reach an output). Transport is a pluggable port so the dev/remote
 text sink and a physical-display sink can coexist.
 
@@ -11,7 +11,7 @@ trait BrailleSink { fn show(&mut self, text: &str); }
 ```
 
 - **`TextBrailleSink`** (implemented): translates the announcement to uncontracted (Grade 1)
-  Unicode braille via `oxeye_core::braille::to_braille` and prints `[braille] ⠓⠑⠇⠇⠕`. This is the
+  Unicode braille via `intone_core::braille::to_braille` and prints `[braille] ⠓⠑⠇⠇⠕`. This is the
   channel used for headless/remote dev, and it works today.
 - **`BrlApiSink`** (planned, see below): sends to a physical display via BRLTTY's BrlAPI.
 
@@ -21,7 +21,7 @@ The `Speaker` holds an `Option<Box<dyn BrailleSink>>`, selected at startup from 
 
 **BRLTTY translates text → braille itself** (its own tables, contracted/Grade 2, per language).
 So the device adapter must send the **raw announcement text** via BrlAPI `writeText` and let
-BRLTTY render it — it must **not** send oxeye's pre-translated Grade-1 cells. oxeye's `to_braille`
+BRLTTY render it — it must **not** send intone's pre-translated Grade-1 cells. intone's `to_braille`
 is therefore the *text-sink* rendering (for sighted devs / terminals), not the device path.
 (Contracted braille for the text sink, if ever wanted, would use liblouis behind `to_braille`.)
 
@@ -64,7 +64,7 @@ controlling tty), which cannot validate these:
    `ENTERTTYMODE` → expect `ACK`.
 3. `show(text)` → `WRITE` with `writeText` flags carrying the **raw text**; expect `ACK`.
 4. **Fail closed to the text sink:** any connect/handshake/write error makes the sink unavailable
-   and oxeye falls back to `TextBrailleSink` — braille output never breaks the reader.
+   and intone falls back to `TextBrailleSink` — braille output never breaks the reader.
 5. Keep `libbrlapi`/`liblouis` **out of the Cargo graph** (LGPL): speak the socket protocol
    directly (the BRLTTY daemon is the arm's-length boundary), consistent with the project's
    permissive-licensing strategy.

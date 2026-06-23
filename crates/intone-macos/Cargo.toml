@@ -1,15 +1,15 @@
 [package]
-name = "oxeye-macos"
+name = "intone-macos"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "macOS (Accessibility / AXAPI) back-end for the oxeye screen reader."
+description = "macOS (Accessibility / AXAPI) back-end for the intone screen reader."
 
 # Does NOT inherit the workspace `unsafe_code = "forbid"`: the macOS Accessibility API and
 # AVFoundation are C/Objective-C FFI boundaries requiring `unsafe`, isolated to the `ax` and
-# `speech` adapters; `oxeye-core` stays unsafe-free. Every `unsafe` block must carry a
+# `speech` adapters; `intone-core` stays unsafe-free. Every `unsafe` block must carry a
 # `// SAFETY:` justification — enforced by `undocumented_unsafe_blocks` (denied in CI via
 # `-D warnings`).
 [lints.rust]
@@ -22,7 +22,7 @@ all = { level = "warn", priority = -1 }
 undocumented_unsafe_blocks = "warn"
 
 [dependencies]
-oxeye-core = { path = "../oxeye-core", version = "0.1.0" }
+intone-core = { path = "../intone-core", version = "0.1.0" }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 

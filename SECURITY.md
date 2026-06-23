@@ -1,6 +1,6 @@
 # Security Policy
 
-oxeye is a screen reader: it can observe everything on screen and captures keyboard input.
+intone is a screen reader: it can observe everything on screen and captures keyboard input.
 We treat it as a high-privilege, high-trust component and take security reports seriously.
 
 ## Reporting a vulnerability
@@ -26,8 +26,8 @@ then publish an advisory and a patched release with credit.
 ## Our commitments
 
 - **No telemetry and no network by default.** Any network feature is opt-in and documented.
-- Read content is **redacted from logs by default** (`oxeye-core::redaction`,
-  `oxeye-core::untrusted`).
+- Read content is **redacted from logs by default** (`intone-core::redaction`,
+  `intone-core::untrusted`).
 - Dependencies are **license- and vulnerability-gated in CI** (`cargo-deny`, `cargo-audit`).
 - Builds are reproducible; a pinned toolchain and an SBOM accompany releases.
 

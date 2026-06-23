@@ -1,12 +1,12 @@
-//! `oxeye-cli` — the testable core of the `oxeye` configuration command.
+//! `intone-cli` — the testable core of the `intone` configuration command.
 //!
 //! This library holds the **disk-free** rule-mutation and formatting logic so it can be unit
 //! tested without touching the filesystem (the imperative shell — loading/saving settings and
-//! printing — lives in `main.rs`). It depends only on [`oxeye_core`], keeping the core itself
+//! printing — lives in `main.rs`). It depends only on [`intone_core`], keeping the core itself
 //! free of any CLI dependency.
 
 use anyhow::{ensure, Context, Result};
-use oxeye_core::{Action, ExclusionEngine, ExclusionRule, Settings, Verbosity};
+use intone_core::{Action, ExclusionEngine, ExclusionRule, Settings, Verbosity};
 
 /// Add `rule` to `settings`, validating it first. Fails **closed**.
 ///
@@ -33,7 +33,7 @@ pub fn remove_rule(settings: &mut Settings, position: usize) -> Result<Exclusion
     let count = settings.exclusions.len();
     ensure!(
         position >= 1 && position <= count,
-        "no rule #{position}; there are {count} rule(s) — see `oxeye exclusions list`"
+        "no rule #{position}; there are {count} rule(s) — see `intone exclusions list`"
     );
     Ok(settings.exclusions.remove(position - 1))
 }
@@ -114,7 +114,7 @@ pub fn optional_setting(value: &str) -> Option<String> {
 /// A synthesis voice as listed for the user. Engine-agnostic — mirrors speech-dispatcher's voice
 /// fields without depending on the SSIP types here, so the formatting stays unit-testable.
 pub struct VoiceInfo {
-    /// Voice name (what `oxeye config voice <name>` expects).
+    /// Voice name (what `intone config voice <name>` expects).
     pub name: String,
     /// Language tag, if the engine reports one.
     pub language: Option<String>,
@@ -135,13 +135,13 @@ fn voice_tag(voice: &VoiceInfo) -> String {
     }
 }
 
-/// Render output modules and the current module's voices for `oxeye voices list`.
+/// Render output modules and the current module's voices for `intone voices list`.
 ///
 /// Engines like espeak-ng expose tens of thousands of voices (every language × speaker variant),
 /// so with no `language_filter` this prints a **per-language summary** (each language tag and its
 /// voice count) and points the user at `--language`. With a filter, it lists the matching voices
 /// by name (capped at [`VOICE_LIST_CAP`], with the remainder summarised). Voices are per the
-/// active output module — switch it with `oxeye config module <name>` and re-run.
+/// active output module — switch it with `intone config module <name>` and re-run.
 #[must_use]
 pub fn format_voices(
     modules: &[String],
@@ -196,7 +196,7 @@ pub fn format_voices(
                 }
             }
             lines.push(format!(
-                "{} voices across {} languages — refine with `oxeye voices list --language <tag>`:",
+                "{} voices across {} languages — refine with `intone voices list --language <tag>`:",
                 voices.len(),
                 by_language.len()
             ));
@@ -251,7 +251,7 @@ pub fn format_config(settings: &Settings) -> String {
 #[cfg(test)]
 mod tests {
     use super::{action_label, add_rule, format_list, remove_rule};
-    use oxeye_core::{Action, ExclusionRule, Settings};
+    use intone_core::{Action, ExclusionRule, Settings};
 
     fn rule(app: Option<&str>, name: Option<&str>, action: Action) -> ExclusionRule {
         ExclusionRule {
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn verbosity_labels_are_stable() {
-        use oxeye_core::Verbosity;
+        use intone_core::Verbosity;
         assert_eq!(super::verbosity_label(Verbosity::Low), "low");
         assert_eq!(super::verbosity_label(Verbosity::Medium), "medium");
         assert_eq!(super::verbosity_label(Verbosity::High), "high");

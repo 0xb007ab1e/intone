@@ -1,4 +1,4 @@
-//! A trust-boundary wrapper for data that originates outside oxeye — primarily text and
+//! A trust-boundary wrapper for data that originates outside intone — primarily text and
 //! metadata read from the platform accessibility tree, which is produced by arbitrary
 //! third-party applications and must be treated as hostile input.
 

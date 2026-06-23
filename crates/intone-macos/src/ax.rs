@@ -1,6 +1,6 @@
 //! The macOS **Accessibility (AXAPI)** adapter.
 //!
-//! Reads the focused element via the system-wide `AXUIElement` and hands it to [`oxeye_core`]
+//! Reads the focused element via the system-wide `AXUIElement` and hands it to [`intone_core`]
 //! for announcement composition — the same policy that drives the Linux and Windows back-ends.
 //! v1 **polls** the focused element and speaks announcements via AVFoundation (see [`speech`]);
 //! AX notifications (`AXObserver`, to replace polling) and structured navigation are follow-ups.
@@ -25,9 +25,9 @@ use core_foundation::boolean::CFBoolean;
 use core_foundation::number::CFNumber;
 use core_foundation::string::CFString;
 use core_foundation_sys::base::CFTypeRef;
-use oxeye_core::announcement::{self, Announcement, Element, States};
-use oxeye_core::exclusions::{Context as AxContext, ExclusionEngine};
-use oxeye_core::{Settings, Verbosity};
+use intone_core::announcement::{self, Announcement, Element, States};
+use intone_core::exclusions::{Context as AxContext, ExclusionEngine};
+use intone_core::{Settings, Verbosity};
 
 use crate::speech::Speaker;
 
@@ -43,7 +43,7 @@ pub(crate) fn run() -> Result<()> {
     // SAFETY: query whether this process is a trusted accessibility client.
     if !unsafe { AXIsProcessTrusted() } {
         bail!(
-            "oxeye-macos needs Accessibility permission \
+            "intone-macos needs Accessibility permission \
              (System Settings → Privacy & Security → Accessibility)"
         );
     }
@@ -53,7 +53,7 @@ pub(crate) fn run() -> Result<()> {
     let system = unsafe { AXUIElementCreateSystemWide() };
     let speaker = Speaker::new();
 
-    eprintln!("oxeye-macos: speaking focus changes. Ctrl-C to quit.");
+    eprintln!("intone-macos: speaking focus changes. Ctrl-C to quit.");
     let mut last = String::new();
     loop {
         if let Some(ann) = read_focused(system, &exclusions, settings.verbosity) {

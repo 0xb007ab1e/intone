@@ -1,4 +1,4 @@
-//! Error types for `oxeye-core`.
+//! Error types for `intone-core`.
 //!
 //! Expected failures are modelled explicitly and the crate fails closed: callers decide on
 //! degraded behaviour, and nothing proceeds on ambiguous state.
@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
-/// Errors produced by `oxeye-core`.
+/// Errors produced by `intone-core`.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {

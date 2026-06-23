@@ -1,19 +1,19 @@
-//! oxeye-linux — Phase-0 spike.
+//! intone-linux — Phase-0 spike.
 //!
 //! Proves the Linux seam end to end on KDE Plasma / Wayland:
 //! - **AT-SPI2** focus events → read the focused element's name + role,
-//! - `oxeye-core`'s **exclusions** policy decides whether to announce,
+//! - `intone-core`'s **exclusions** policy decides whether to announce,
 //! - output via a persistent **speech-dispatcher (SSIP)** connection that **interrupts** the
-//!   previous utterance on each new focus — or, with `OXEYE_SPEECH=text`, printed to stdout,
+//!   previous utterance on each new focus — or, with `INTONE_SPEECH=text`, printed to stdout,
 //! - global **hotkeys** via KWin's `org.freedesktop.a11y.KeyboardMonitor`: **Control**
 //!   silences, **Pause** repeats the last announcement.
 //!
-//! Output mode is chosen by the `OXEYE_SPEECH` env var: `speech` (default), `text`
+//! Output mode is chosen by the `INTONE_SPEECH` env var: `speech` (default), `text`
 //! (print only — no audio, no daemon; for headless/remote testing), or `both`.
 //!
 //! ```text
-//! cargo run -p oxeye-linux                 # speak (needs audio + speech-dispatcher)
-//! OXEYE_SPEECH=text cargo run -p oxeye-linux   # print announcements (headless/remote)
+//! cargo run -p intone-linux                 # speak (needs audio + speech-dispatcher)
+//! INTONE_SPEECH=text cargo run -p intone-linux   # print announcements (headless/remote)
 //! ```
 
 use std::collections::HashMap;
@@ -35,11 +35,11 @@ use ssip_client_async::tokio::AsyncClient;
 use ssip_client_async::{ClientError, ClientName, ClientScope, MessageScope};
 use tokio::io::{AsyncBufRead, AsyncWrite};
 
-use oxeye_core::announcement;
-use oxeye_core::braille;
-use oxeye_core::exclusions::{Context as ExclusionContext, ExclusionEngine};
-use oxeye_core::navigation::{self, Direction, NavCategory};
-use oxeye_core::{Settings, Speech};
+use intone_core::announcement;
+use intone_core::braille;
+use intone_core::exclusions::{Context as ExclusionContext, ExclusionEngine};
+use intone_core::navigation::{self, Direction, NavCategory};
+use intone_core::{Settings, Speech};
 
 /// X keysyms for the keys we react to.
 const KEYSYM_CONTROL_L: u32 = 0xffe3;
@@ -77,7 +77,7 @@ enum SpeechMode {
 
 impl SpeechMode {
     fn from_env() -> Self {
-        match std::env::var("OXEYE_SPEECH").as_deref() {
+        match std::env::var("INTONE_SPEECH").as_deref() {
             Ok("text") => Self::Text,
             Ok("both") => Self::Both,
             _ => Self::Speech,
@@ -224,7 +224,7 @@ struct Keyboard {
     proxy: KeyboardMonitorProxy<'static>,
 }
 
-/// The key-grab request oxeye sends KWin: `(modifiers, keystrokes)` for `SetKeyGrabs`.
+/// The key-grab request intone sends KWin: `(modifiers, keystrokes)` for `SetKeyGrabs`.
 ///
 /// `modifiers` is deliberately **empty**. A keysym listed there is *consumed* by the
 /// compositor — KWin's `a11ykeyboardmonitor.cpp` `processKey` returns `true` (intercepts) for
@@ -312,7 +312,7 @@ async fn setup_keyboard() -> Option<Keyboard> {
 }
 
 /// Run the Linux screen-reader back-end: connect AT-SPI, speech, and hotkeys, then loop
-/// until interrupted. The `oxeye-linux` binary sets up the async runtime and calls this.
+/// until interrupted. The `intone-linux` binary sets up the async runtime and calls this.
 pub async fn run() -> Result<()> {
     tracing_subscriber::fmt::init();
 
@@ -356,7 +356,7 @@ pub async fn run() -> Result<()> {
 
     // Hotkeys are best-effort: if the compositor doesn't offer KeyboardMonitor (non-KWin,
     // headless, or unauthorised), continue with focus readout only — essential for
-    // OXEYE_SPEECH=text on machines without a KWin/Wayland session.
+    // INTONE_SPEECH=text on machines without a KWin/Wayland session.
     let keyboard = setup_keyboard().await;
     if keyboard.is_none() {
         tracing::warn!(
@@ -372,14 +372,14 @@ pub async fn run() -> Result<()> {
         .context("installing SIGTERM handler")?;
 
     eprintln!(
-        "oxeye spike ({}): Tab/Alt-Tab to hear focus · Control silences · Pause repeats · Ctrl-C quits.",
+        "intone spike ({}): Tab/Alt-Tab to hear focus · Control silences · Pause repeats · Ctrl-C quits.",
         match mode {
             SpeechMode::Speech => "speech",
             SpeechMode::Text => "text",
             SpeechMode::Both => "speech+text",
         }
     );
-    speaker.announce("oxeye spike running", true).await;
+    speaker.announce("intone spike running", true).await;
 
     let mut last_text: Option<String> = None;
     let mut caret: Option<CaretTracker> = None;
@@ -559,7 +559,7 @@ pub async fn run() -> Result<()> {
                         if voice_rotation.is_empty() {
                             speaker
                                 .announce(
-                                    "no voice rotation configured; set one with oxeye config rotation",
+                                    "no voice rotation configured; set one with intone config rotation",
                                     true,
                                 )
                                 .await;
@@ -655,7 +655,7 @@ async fn connect_speech(settings: &Settings) -> Result<SsipClient> {
             )?
         }
     };
-    tts.set_client_name(ClientName::new("oxeye", "oxeye"))
+    tts.set_client_name(ClientName::new("intone", "intone"))
         .await
         .context("registering SSIP client name")?;
     tts.check_client_name_set()
@@ -865,7 +865,7 @@ async fn read_text(conn: &AccessibilityConnection, ev: &StateChangedEvent) -> Op
     clean_text(&raw)
 }
 
-// Numeric value formatting lives in `oxeye_core::announcement::format_value` (shared with the
+// Numeric value formatting lives in `intone_core::announcement::format_value` (shared with the
 // Windows back-end).
 
 /// Trim text-field content for speech and drop it if there is nothing left.
@@ -1291,7 +1291,7 @@ mod value_format_tests {
     }
 }
 
-/// Map an AT-SPI [`StateSet`] onto the subset of states oxeye announces. "Disabled" is gated on
+/// Map an AT-SPI [`StateSet`] onto the subset of states intone announces. "Disabled" is gated on
 /// focusability so static, non-interactive content isn't reported as dimmed.
 fn states_from(set: StateSet) -> announcement::States {
     announcement::States {

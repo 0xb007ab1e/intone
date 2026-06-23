@@ -1,14 +1,14 @@
-//! `oxeye-macos` — the macOS back-end of the **oxeye** screen reader.
+//! `intone-macos` — the macOS back-end of the **intone** screen reader.
 //!
 //! Adapts the macOS **Accessibility API** (AXAPI: `AXUIElement`) — reading the focused element
 //! and its attributes — and hands the data to the reusable, platform-agnostic policy in
-//! [`oxeye_core`] (announcement composition, exclusions, verbosity, navigation, braille). The
-//! same core that drives `oxeye-linux` and `oxeye-windows` drives this; only the
+//! [`intone_core`] (announcement composition, exclusions, verbosity, navigation, braille). The
+//! same core that drives `intone-linux` and `intone-windows` drives this; only the
 //! accessibility-tree, event, and output adapters differ.
 //!
 //! AXAPI and AVFoundation are C/Objective-C FFI boundaries requiring `unsafe`, confined to the
 //! [`ax`] (accessibility) and `speech` (AVFoundation `AVSpeechSynthesizer`) modules (see this
-//! crate's `unsafe_code = "allow"`); `oxeye-core` itself stays `unsafe`-free.
+//! crate's `unsafe_code = "allow"`); `intone-core` itself stays `unsafe`-free.
 
 #[cfg(target_os = "macos")]
 mod ax;
@@ -35,7 +35,7 @@ pub fn run() -> anyhow::Result<()> {
 #[cfg(not(target_os = "macos"))]
 pub fn run() -> anyhow::Result<()> {
     anyhow::bail!(
-        "oxeye-macos requires the macOS Accessibility APIs; this host is {}",
+        "intone-macos requires the macOS Accessibility APIs; this host is {}",
         std::env::consts::OS
     )
 }

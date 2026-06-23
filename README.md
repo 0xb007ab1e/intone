@@ -1,8 +1,8 @@
-# oxeye
+# intone
 
-> Working name (easily renamed). A free, open-source, **cross-platform**,
-> **privacy-respecting** screen reader — built core-first so the same engine carries
-> Linux → Windows → macOS.
+> A free, open-source, **cross-platform**, **privacy-respecting** screen reader — built
+> core-first so the same engine carries Linux → Windows → macOS. The name: to *intone* is to
+> speak in a clear, measured voice — exactly what a screen reader does.
 
 **Status:** `0.1.0` — Linux (AT-SPI2) and Windows (UI Automation) back-ends on a shared Rust
 core. See the [`CHANGELOG`](CHANGELOG.md), [`FEASIBILITY.md`](FEASIBILITY.md), and
@@ -38,7 +38,7 @@ every platform** — the standard for foundational cross-platform Rust projects 
 ### Keeping the permissive promise (dependency-license strategy)
 
 The Linux speech/braille stack is copyleft; it's kept **at arm's length** so no copyleft
-reaches oxeye's code (license-compliance — see the project ruleset):
+reaches intone's code (license-compliance — see the project ruleset):
 
 | Dependency | License | How we use it | Effect |
 |------------|---------|---------------|--------|
@@ -55,17 +55,17 @@ Do **not** statically link or vendor GPL code into the core.
 ## Architecture (intended)
 
 ```
-oxeye-core   — reusable, platform-agnostic: command model, settings, exclusions engine,
+intone-core   — reusable, platform-agnostic: command model, settings, exclusions engine,
                verbosity/announcement policy, scripting host, speech/braille routing
-oxeye-cli    — `oxeye` command: manage configuration (exclusion rules) — platform-agnostic
-oxeye-linux  — AT-SPI2 tree reader + KWin a11y KeyboardMonitor input (Wayland verified);
+intone-cli    — `intone` command: manage configuration (exclusion rules) — platform-agnostic
+intone-linux  — AT-SPI2 tree reader + KWin a11y KeyboardMonitor input (Wayland verified);
                speech-dispatcher output
-oxeye-windows — UI Automation (UIA) back-end (scaffold): focus reading via the shared core;
+intone-windows — UI Automation (UIA) back-end (scaffold): focus reading via the shared core;
                compiled in CI on a Windows runner (runtime needs a real desktop)
-(later) oxeye-macos (AXAPI)
+(later) intone-macos (AXAPI)
 ```
 
-The Windows back-end reuses `oxeye-core`'s announcement/exclusions/navigation/braille policy
+The Windows back-end reuses `intone-core`'s announcement/exclusions/navigation/braille policy
 **unchanged** — it only adapts the UIA tree, events, and output. That core reuse is the whole
 point of the core-first design.
 
@@ -78,27 +78,27 @@ install (`speech-dispatcher` + `espeak-ng`). Details in `LINUX-FIRST-PLAN.md`.
 ## Running
 
 ```sh
-cargo run -p oxeye-linux                      # speak (needs audio + speech-dispatcher)
-OXEYE_SPEECH=text cargo run -p oxeye-linux    # print announcements (headless/remote dev)
+cargo run -p intone-linux                      # speak (needs audio + speech-dispatcher)
+INTONE_SPEECH=text cargo run -p intone-linux    # print announcements (headless/remote dev)
 ```
 
-Developing remotely and want to *hear* it? Either use `OXEYE_SPEECH=text`, or route the audio
+Developing remotely and want to *hear* it? Either use `INTONE_SPEECH=text`, or route the audio
 to your machine over SSH/tailnet — see [`docs/remote-audio.md`](docs/remote-audio.md)
 (`scripts/remote-audio.sh` automates it).
 
 ## Managing exclusions
 
 Exclusions tell the reader to ignore, shorten, or de-prioritise announcements from noisy apps,
-regions, or controls. Manage them with the `oxeye` command (writes the user config — no need to
+regions, or controls. Manage them with the `intone` command (writes the user config — no need to
 hand-edit TOML):
 
 ```sh
-oxeye exclusions list
-oxeye exclusions add --app slack --action suppress              # silence an app
-oxeye exclusions add --name-regex '(?i)cookie' --role banner --action summarize
-oxeye exclusions add --role statusbar --action lower-priority   # speak, but don't interrupt
-oxeye exclusions remove 2                                       # by number from `list`
-oxeye exclusions path                                           # where the config lives
+intone exclusions list
+intone exclusions add --app slack --action suppress              # silence an app
+intone exclusions add --name-regex '(?i)cookie' --role banner --action summarize
+intone exclusions add --role statusbar --action lower-priority   # speak, but don't interrupt
+intone exclusions remove 2                                       # by number from `list`
+intone exclusions path                                           # where the config lives
 ```
 
 A rule matches when **all** its set fields match; the **first** matching rule wins. Actions:
@@ -112,10 +112,10 @@ plain TOML — human-readable and shareable.
 How much detail the reader speaks for each focused element:
 
 ```sh
-oxeye config show                  # current verbosity / network / rule count
-oxeye config verbosity low         # label + state/value only
-oxeye config verbosity medium      # adds the role (default)
-oxeye config verbosity high        # adds description + owning application
+intone config show                  # current verbosity / network / rule count
+intone config verbosity low         # label + state/value only
+intone config verbosity medium      # adds the role (default)
+intone config verbosity high        # adds description + owning application
 ```
 
 Notable **states** are always spoken (e.g. *checked* / *not checked*, *expanded* / *collapsed*,
@@ -124,7 +124,7 @@ slider's number or a single-line text field's content (**never a password field'
 multi-line documents aren't dumped on focus). These carry meaning, so they aren't trimmed even
 at low verbosity.
 
-As you move the **caret** within a text field, oxeye announces the character you cross (or the
+As you move the **caret** within a text field, intone announces the character you cross (or the
 word/line on a larger jump); **deleting** speaks the removed text, and **selecting** speaks the
 selected text (or a length for large selections) — but **never** within a password field.
 
@@ -138,23 +138,23 @@ hear *"no next button"*.
 
 ## Voices & speech
 
-Pick the voice and tune the speech — oxeye uses any voice your speech-dispatcher install offers
+Pick the voice and tune the speech — intone uses any voice your speech-dispatcher install offers
 (open-source by default: **espeak-ng**, with **Piper** for neural voices):
 
 ```sh
-oxeye voices list                  # installed modules + a per-language voice summary
-oxeye voices list --language en    # voices for a language (prefix match)
-oxeye config voice <name>          # select a voice (default = engine default)
-oxeye config module piper          # switch output module (e.g. espeak-ng / piper)
-oxeye config rate 60               # rate / pitch / volume, 0–100
-oxeye config rotation Alan Klaus   # voices to cycle with Ctrl+Alt+V while running
+intone voices list                  # installed modules + a per-language voice summary
+intone voices list --language en    # voices for a language (prefix match)
+intone config voice <name>          # select a voice (default = engine default)
+intone config module piper          # switch output module (e.g. espeak-ng / piper)
+intone config rate 60               # rate / pitch / volume, 0–100
+intone config rotation Alan Klaus   # voices to cycle with Ctrl+Alt+V while running
 ```
 
 Full guide, including Piper setup: [`docs/voices.md`](docs/voices.md).
 
 ## Braille
 
-Enable braille with `oxeye config braille on`. Each announcement is then also translated to
+Enable braille with `intone config braille on`. Each announcement is then also translated to
 uncontracted (Grade 1) Unicode braille and emitted, e.g. `[braille] ⠓⠑⠇⠇⠕`. Contracted (Grade 2)
 braille and other languages via **liblouis**, and output to a physical display via **BrlAPI**,
 slot in behind this translation seam and are planned. The role is treated as chrome

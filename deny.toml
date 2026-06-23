@@ -32,7 +32,7 @@ allow = [
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
-# Allow path/workspace deps without an explicit version (our internal oxeye-core).
+# Allow path/workspace deps without an explicit version (our internal intone-core).
 allow-wildcard-paths = true
 
 [sources]
