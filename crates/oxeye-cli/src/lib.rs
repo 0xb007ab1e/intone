@@ -143,7 +143,11 @@ fn voice_tag(voice: &VoiceInfo) -> String {
 /// by name (capped at [`VOICE_LIST_CAP`], with the remainder summarised). Voices are per the
 /// active output module — switch it with `oxeye config module <name>` and re-run.
 #[must_use]
-pub fn format_voices(modules: &[String], voices: &[VoiceInfo], language_filter: Option<&str>) -> String {
+pub fn format_voices(
+    modules: &[String],
+    voices: &[VoiceInfo],
+    language_filter: Option<&str>,
+) -> String {
     let module_list = if modules.is_empty() {
         "(none)".to_owned()
     } else {
@@ -169,7 +173,10 @@ pub fn format_voices(modules: &[String], voices: &[VoiceInfo], language_filter: 
                     "no voices for language '{filter}' in the current module"
                 ));
             } else {
-                lines.push(format!("voices for language '{filter}' ({}):", matching.len()));
+                lines.push(format!(
+                    "voices for language '{filter}' ({}):",
+                    matching.len()
+                ));
                 for voice in matching.iter().take(VOICE_LIST_CAP) {
                     lines.push(format!("  {}{}", voice.name, voice_tag(voice)));
                 }
@@ -383,7 +390,10 @@ mod tests {
         ];
         let out = format_voices(&modules, &voices, None);
         assert!(out.contains("output modules: espeak-ng, piper"));
-        assert!(out.contains("3 voices across 2 languages"), "summary header");
+        assert!(
+            out.contains("3 voices across 2 languages"),
+            "summary header"
+        );
         assert!(out.contains("en (2)"), "english count");
         assert!(out.contains("de (1)"), "german count");
     }
@@ -398,7 +408,10 @@ mod tests {
             voice("Klaus", Some("de-DE"), None),
         ];
         let out = format_voices(&[], &voices, Some("EN"));
-        assert!(out.contains("voices for language 'EN' (2):"), "both English locales");
+        assert!(
+            out.contains("voices for language 'EN' (2):"),
+            "both English locales"
+        );
         assert!(out.contains("Daniel [en-GB]"));
         assert!(out.contains("Alan [en-US]"));
         assert!(!out.contains("Klaus"), "non-matching language excluded");
