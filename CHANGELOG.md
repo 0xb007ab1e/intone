@@ -7,6 +7,14 @@ between minor versions.
 
 ## [Unreleased]
 
+### Added
+
+- **`oxeye-cli`** — speech configuration commands: `oxeye config voice|module|language|rate|pitch|volume`
+  set the synthesis voice, speech-dispatcher output module, language (BCP-47), and rate/pitch/volume
+  (0–100, validated). For `voice`/`module`/`language`, the value `default` reverts to the engine
+  default; `oxeye config show` now reports all speech settings. First step of multi-voice support
+  (engine-agnostic, OSS-first); voice discovery (`oxeye voices list`) and espeak-ng/Piper docs follow.
+
 ### Fixed
 
 - **`oxeye-linux`** — the first character typed into a freshly focused field is now announced.
