@@ -575,6 +575,70 @@ dependencies = [
 ]
 
 [[package]]
+name = "intone-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "intone-core",
+ "ssip-client-async",
+]
+
+[[package]]
+name = "intone-core"
+version = "0.1.0"
+dependencies = [
+ "directories",
+ "regex",
+ "serde",
+ "thiserror 2.0.18",
+ "toml",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
+name = "intone-linux"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "atspi",
+ "futures-lite",
+ "intone-core",
+ "ssip-client-async",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "zbus",
+]
+
+[[package]]
+name = "intone-macos"
+version = "0.1.0"
+dependencies = [
+ "accessibility-sys",
+ "anyhow",
+ "core-foundation",
+ "core-foundation-sys",
+ "intone-core",
+ "objc2",
+ "objc2-avf-audio",
+ "objc2-foundation",
+ "tracing",
+]
+
+[[package]]
+name = "intone-windows"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "intone-core",
+ "tracing",
+ "windows",
+ "windows-core",
+]
+
+[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -721,70 +785,6 @@ checksum = "9aa2b01e1d916879f73a53d01d1d6cee68adbb31d6d9177a8cfce093cced1d50"
 dependencies = [
  "futures-core",
  "pin-project-lite",
-]
-
-[[package]]
-name = "oxeye-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "oxeye-core",
- "ssip-client-async",
-]
-
-[[package]]
-name = "oxeye-core"
-version = "0.1.0"
-dependencies = [
- "directories",
- "regex",
- "serde",
- "thiserror 2.0.18",
- "toml",
- "tracing",
- "zeroize",
-]
-
-[[package]]
-name = "oxeye-linux"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "atspi",
- "futures-lite",
- "oxeye-core",
- "ssip-client-async",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "zbus",
-]
-
-[[package]]
-name = "oxeye-macos"
-version = "0.1.0"
-dependencies = [
- "accessibility-sys",
- "anyhow",
- "core-foundation",
- "core-foundation-sys",
- "objc2",
- "objc2-avf-audio",
- "objc2-foundation",
- "oxeye-core",
- "tracing",
-]
-
-[[package]]
-name = "oxeye-windows"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "oxeye-core",
- "tracing",
- "windows",
- "windows-core",
 ]
 
 [[package]]

@@ -5,11 +5,11 @@
 # without forcing contributors onto rustup or pinning deps by hand.
 resolver = "3"
 members = [
-    "crates/oxeye-core",
-    "crates/oxeye-cli",
-    "crates/oxeye-linux",
-    "crates/oxeye-windows",
-    "crates/oxeye-macos",
+    "crates/intone-core",
+    "crates/intone-cli",
+    "crates/intone-linux",
+    "crates/intone-windows",
+    "crates/intone-macos",
 ]
 
 [workspace.package]
@@ -17,7 +17,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
-authors = ["The oxeye Authors"]
+authors = ["The intone Authors"]
 description = "A free, cross-platform, privacy-respecting screen reader."
 
 # Security/quality posture enforced workspace-wide (per the SSDLC ruleset).

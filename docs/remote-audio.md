@@ -1,36 +1,36 @@
-# Remote audio: hearing oxeye while developing remotely
+# Remote audio: hearing intone while developing remotely
 
-When you develop oxeye over SSH/tmux (no speakers on the dev box, or you're away from
+When you develop intone over SSH/tmux (no speakers on the dev box, or you're away from
 it), there are two ways to perceive its speech:
 
-1. **Text mode (no audio, simplest).** `OXEYE_SPEECH=text` prints each announcement to the
+1. **Text mode (no audio, simplest).** `INTONE_SPEECH=text` prints each announcement to the
    terminal — readable over SSH, no daemon, no audio. Best for logic/CI work. (Use
-   `OXEYE_SPEECH=both` to print *and* speak.)
+   `INTONE_SPEECH=both` to print *and* speak.)
 2. **Route the audio to your machine** over the tunnel/tailnet — this page.
 
-## How oxeye produces audio
+## How intone produces audio
 
 ```
-oxeye --(SSIP socket)--> speech-dispatcher --(output module: espeak-ng)--> PipeWire/Pulse --> speakers
+intone --(SSIP socket)--> speech-dispatcher --(output module: espeak-ng)--> PipeWire/Pulse --> speakers
 ```
 
-oxeye never touches the audio device directly. The audio sink is chosen by
+intone never touches the audio device directly. The audio sink is chosen by
 **speech-dispatcher**, which honours the standard **`PULSE_SERVER`** environment variable
-(Parrot/Debian use PipeWire's Pulse-compatible server). So "route oxeye's audio" really means
+(Parrot/Debian use PipeWire's Pulse-compatible server). So "route intone's audio" really means
 "point speech-dispatcher's `PULSE_SERVER` at your remote machine."
 
-> **Key property:** oxeye auto-spawns speech-dispatcher and the daemon *inherits oxeye's
-> environment*. So if `PULSE_SERVER` is set when you start oxeye, the speech it spawns uses
-> it — no oxeye flag needed.
+> **Key property:** intone auto-spawns speech-dispatcher and the daemon *inherits intone's
+> environment*. So if `PULSE_SERVER` is set when you start intone, the speech it spawns uses
+> it — no intone flag needed.
 >
-> **Gotcha:** oxeye only spawns the daemon if one isn't already running. A **stale local
+> **Gotcha:** intone only spawns the daemon if one isn't already running. A **stale local
 > speech-dispatcher** will keep playing on the dev box and ignore `PULSE_SERVER`. Kill it
-> first so oxeye respawns it with the right env: `pkill -u "$(id -u)" speech-dispatcher`.
+> first so intone respawns it with the right env: `pkill -u "$(id -u)" speech-dispatcher`.
 > (`scripts/remote-audio.sh` does this for you.)
 
 ## Recipe A — over an SSH reverse tunnel
 
-You're SSH'd from your **station** (has speakers) into the **dev box** (runs oxeye).
+You're SSH'd from your **station** (has speakers) into the **dev box** (runs intone).
 
 1. **On your station**, expose its PipeWire/Pulse over TCP (cookie-authenticated, localhost):
    ```sh
@@ -40,10 +40,10 @@ You're SSH'd from your **station** (has speakers) into the **dev box** (runs oxe
    ```sh
    ssh -R 24713:localhost:4713 devbox
    ```
-3. **On the dev box**, point speech-dispatcher at the forwarded socket and run oxeye:
+3. **On the dev box**, point speech-dispatcher at the forwarded socket and run intone:
    ```sh
    export PULSE_SERVER=tcp:localhost:24713
-   scripts/remote-audio.sh            # restarts the daemon with this env, then runs oxeye
+   scripts/remote-audio.sh            # restarts the daemon with this env, then runs intone
    ```
 
 Audio now plays on your station. (You still need GUI focus changes on the dev box's desktop
@@ -75,7 +75,7 @@ Both machines are on the same Tailscale tailnet (WireGuard-encrypted mesh).
 
 ## When you're at the desktop
 
-Just run normally (`cargo run -p oxeye-linux`) — speech plays on the local speakers; none of
+Just run normally (`cargo run -p intone-linux`) — speech plays on the local speakers; none of
 this is needed.
 
 ## Future work

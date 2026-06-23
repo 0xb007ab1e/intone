@@ -1,16 +1,16 @@
-# oxeye — Threat Model (STRIDE)
+# intone — Threat Model (STRIDE)
 
 _Status: living document. Revisit on any change to a trust boundary._
 _Method: STRIDE over the data-flow diagram (per `workflow-threat-model`)._
 
 ## System & data flow
 
-oxeye reads the platform accessibility tree, optionally captures keys, applies the
+intone reads the platform accessibility tree, optionally captures keys, applies the
 exclusions/verbosity policy, and emits speech (and later braille). On the maintainer's
 target (Parrot 7, KDE Plasma 6 / Wayland) the platform mechanisms are:
 
 ```
-[apps] --AT-SPI2--> [oxeye-linux back-end] --> [oxeye-core policy] --> [speech-dispatcher] --> audio
+[apps] --AT-SPI2--> [intone-linux back-end] --> [intone-core policy] --> [speech-dispatcher] --> audio
                           ^ KWin a11y KeyboardMonitor (key capture)
 [settings/exclusions] <--0600--> local disk           [add-ons] -- sandboxed --> core API
 ```
@@ -20,11 +20,11 @@ sockets), mediated by the kernel and filesystem permissions — **not** the netw
 
 ## Trust boundaries
 
-1. Application UI → oxeye — accessibility-tree data is **untrusted input** (`Untrusted<T>`).
-2. Keyboard → oxeye — the capture path; oxeye is a keylogger by function.
-3. oxeye ↔ disk — settings/exclusions at rest.
-4. oxeye ↔ add-ons/scripts — extensibility is the **largest attack surface**.
-5. oxeye ↔ network — **only if** an optional, opt-in networked feature is added later.
+1. Application UI → intone — accessibility-tree data is **untrusted input** (`Untrusted<T>`).
+2. Keyboard → intone — the capture path; intone is a keylogger by function.
+3. intone ↔ disk — settings/exclusions at rest.
+4. intone ↔ add-ons/scripts — extensibility is the **largest attack surface**.
+5. intone ↔ network — **only if** an optional, opt-in networked feature is added later.
 
 ## Data classification
 

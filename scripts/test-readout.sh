@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# test-readout.sh — headless/remote functional check for the oxeye screen reader.
+# test-readout.sh — headless/remote functional check for the intone screen reader.
 #
-# Runs oxeye ONCE in TEXT mode (OXEYE_SPEECH=text: prints announcements, no audio, no
-# daemon), then for each test app: launches it so a focus event fires, captures what oxeye
+# Runs intone ONCE in TEXT mode (INTONE_SPEECH=text: prints announcements, no audio, no
+# daemon), then for each test app: launches it so a focus event fires, captures what intone
 # announces (plus any WARN diagnostics), and tears that app down before the next one. On
 # exit a trap kills everything — no idle processes left behind. Safe to run repeatedly.
 #
@@ -16,15 +16,15 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-bin="$repo_root/target/debug/oxeye-linux"
+bin="$repo_root/target/debug/intone-linux"
 
 if [ "$#" -gt 0 ]; then
   app_specs=("$*")
 else
-  app_specs=("kdialog --msgbox oxeye-readout-test" "kcalc")
+  app_specs=("kdialog --msgbox intone-readout-test" "kcalc")
 fi
 
-log="$(mktemp -t oxeye-readout.XXXXXX)"
+log="$(mktemp -t intone-readout.XXXXXX)"
 pids=()
 
 cleanup() {
@@ -41,17 +41,17 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-echo "building oxeye-linux…" >&2
-( cd "$repo_root" && cargo build -q -p oxeye-linux )
+echo "building intone-linux…" >&2
+( cd "$repo_root" && cargo build -q -p intone-linux )
 
-# Clear any stray oxeye from a prior run so the Orca D-Bus name is free.
+# Clear any stray intone from a prior run so the Orca D-Bus name is free.
 pkill -f "$bin" 2>/dev/null || true
 
-echo "starting oxeye (text mode; no audio, no daemon)…" >&2
-OXEYE_SPEECH=text "$bin" >"$log" 2>&1 &
+echo "starting intone (text mode; no audio, no daemon)…" >&2
+INTONE_SPEECH=text "$bin" >"$log" 2>&1 &
 pids+=("$!")
 
-# Wait until oxeye is in its event loop (bounded; ~10s max).
+# Wait until intone is in its event loop (bounded; ~10s max).
 for _ in $(seq 1 100); do
   grep -q "spike running" "$log" && break
   sleep 0.1

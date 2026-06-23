@@ -1,19 +1,19 @@
-//! `oxeye` — command-line configuration manager for the oxeye screen reader.
+//! `intone` — command-line configuration manager for the intone screen reader.
 //!
 //! Currently manages user-defined **exclusion rules** (the rules that tell the reader to
 //! suppress, summarise, or de-prioritise announcements). The disk-free logic lives in the
-//! `oxeye_cli` library; this binary is the imperative shell: parse args, load/save settings,
+//! `intone_cli` library; this binary is the imperative shell: parse args, load/save settings,
 //! print results.
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
-use oxeye_core::{Action, ExclusionRule, Settings, Verbosity};
+use intone_core::{Action, ExclusionRule, Settings, Verbosity};
 use ssip_client_async::fifo::synchronous::Builder as SsipBuilder;
 use ssip_client_async::{ClientName, Response};
 
-/// Configure the oxeye screen reader.
+/// Configure the intone screen reader.
 #[derive(Parser)]
-#[command(name = "oxeye", version, about)]
+#[command(name = "intone", version, about)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -114,7 +114,7 @@ impl From<Toggle> for bool {
     }
 }
 
-/// CLI mirror of [`oxeye_core::Verbosity`].
+/// CLI mirror of [`intone_core::Verbosity`].
 #[derive(Clone, Copy, ValueEnum)]
 enum VerbosityArg {
     /// Just the essential label.
@@ -156,14 +156,14 @@ enum ExclusionsCommand {
     },
     /// Remove the rule numbered N (as shown by `list`).
     Remove {
-        /// 1-based rule number from `oxeye exclusions list`.
+        /// 1-based rule number from `intone exclusions list`.
         index: usize,
     },
     /// Print the path to the settings file.
     Path,
 }
 
-/// CLI mirror of [`oxeye_core::Action`], so the core stays free of any CLI dependency.
+/// CLI mirror of [`intone_core::Action`], so the core stays free of any CLI dependency.
 #[derive(Clone, Copy, ValueEnum)]
 enum ActionArg {
     /// Do not announce at all.
@@ -202,7 +202,7 @@ fn run_voices(command: VoicesCommand) -> Result<()> {
             )?;
             // SSIP is write-then-read: name the client, then read each LIST's reply in turn.
             client
-                .set_client_name(ClientName::new("oxeye", "voices"))
+                .set_client_name(ClientName::new("intone", "voices"))
                 .context("naming SSIP client")?;
             client
                 .check_client_name_set()
@@ -221,7 +221,7 @@ fn run_voices(command: VoicesCommand) -> Result<()> {
                 .receive_synthesis_voices()
                 .context("reading synthesis voices")?
                 .into_iter()
-                .map(|voice| oxeye_cli::VoiceInfo {
+                .map(|voice| intone_cli::VoiceInfo {
                     name: voice.name,
                     language: voice.language,
                     dialect: voice.dialect,
@@ -229,7 +229,7 @@ fn run_voices(command: VoicesCommand) -> Result<()> {
                 .collect::<Vec<_>>();
             println!(
                 "{}",
-                oxeye_cli::format_voices(&modules, &voices, language.as_deref())
+                intone_cli::format_voices(&modules, &voices, language.as_deref())
             );
         }
     }
@@ -241,7 +241,7 @@ fn run_config(command: ConfigCommand) -> Result<()> {
     match command {
         ConfigCommand::Show => {
             let settings = Settings::load().context("loading settings")?;
-            println!("{}", oxeye_cli::format_config(&settings));
+            println!("{}", intone_cli::format_config(&settings));
         }
         ConfigCommand::Verbosity { level } => {
             let mut settings = Settings::load().context("loading settings")?;
@@ -249,7 +249,7 @@ fn run_config(command: ConfigCommand) -> Result<()> {
             settings.save().context("saving settings")?;
             println!(
                 "verbosity set to {}",
-                oxeye_cli::verbosity_label(settings.verbosity)
+                intone_cli::verbosity_label(settings.verbosity)
             );
         }
         ConfigCommand::Braille { state } => {
@@ -260,37 +260,37 @@ fn run_config(command: ConfigCommand) -> Result<()> {
         }
         ConfigCommand::Voice { name } => {
             let mut settings = Settings::load().context("loading settings")?;
-            settings.speech.voice = oxeye_cli::optional_setting(&name);
+            settings.speech.voice = intone_cli::optional_setting(&name);
             settings.save().context("saving settings")?;
             report_optional("voice", &settings.speech.voice);
         }
         ConfigCommand::Module { name } => {
             let mut settings = Settings::load().context("loading settings")?;
-            settings.speech.output_module = oxeye_cli::optional_setting(&name);
+            settings.speech.output_module = intone_cli::optional_setting(&name);
             settings.save().context("saving settings")?;
             report_optional("output module", &settings.speech.output_module);
         }
         ConfigCommand::Language { tag } => {
             let mut settings = Settings::load().context("loading settings")?;
-            settings.speech.language = oxeye_cli::optional_setting(&tag);
+            settings.speech.language = intone_cli::optional_setting(&tag);
             settings.save().context("saving settings")?;
             report_optional("language", &settings.speech.language);
         }
         ConfigCommand::Rate { value } => {
             let mut settings = Settings::load().context("loading settings")?;
-            settings.speech.rate = oxeye_cli::checked_level(value)?;
+            settings.speech.rate = intone_cli::checked_level(value)?;
             settings.save().context("saving settings")?;
             println!("rate set to {}", settings.speech.rate);
         }
         ConfigCommand::Pitch { value } => {
             let mut settings = Settings::load().context("loading settings")?;
-            settings.speech.pitch = oxeye_cli::checked_level(value)?;
+            settings.speech.pitch = intone_cli::checked_level(value)?;
             settings.save().context("saving settings")?;
             println!("pitch set to {}", settings.speech.pitch);
         }
         ConfigCommand::Volume { value } => {
             let mut settings = Settings::load().context("loading settings")?;
-            settings.speech.volume = oxeye_cli::checked_level(value)?;
+            settings.speech.volume = intone_cli::checked_level(value)?;
             settings.save().context("saving settings")?;
             println!("volume set to {}", settings.speech.volume);
         }
@@ -322,7 +322,7 @@ fn run_exclusions(command: ExclusionsCommand) -> Result<()> {
     match command {
         ExclusionsCommand::List => {
             let settings = Settings::load().context("loading settings")?;
-            println!("{}", oxeye_cli::format_list(&settings));
+            println!("{}", intone_cli::format_list(&settings));
         }
         ExclusionsCommand::Add {
             app,
@@ -337,21 +337,21 @@ fn run_exclusions(command: ExclusionsCommand) -> Result<()> {
                 name_regex,
                 action: action.into(),
             };
-            oxeye_cli::add_rule(&mut settings, rule)?;
+            intone_cli::add_rule(&mut settings, rule)?;
             settings.save().context("saving settings")?;
             println!("added rule; {} now configured", settings.exclusions.len());
         }
         ExclusionsCommand::Remove { index } => {
             let mut settings = Settings::load().context("loading settings")?;
-            let removed = oxeye_cli::remove_rule(&mut settings, index)?;
+            let removed = intone_cli::remove_rule(&mut settings, index)?;
             settings.save().context("saving settings")?;
             println!(
                 "removed rule #{index} ([{}])",
-                oxeye_cli::action_label(removed.action)
+                intone_cli::action_label(removed.action)
             );
         }
         ExclusionsCommand::Path => {
-            let path = oxeye_core::settings::config_file().context("locating config file")?;
+            let path = intone_core::settings::config_file().context("locating config file")?;
             println!("{}", path.display());
         }
     }

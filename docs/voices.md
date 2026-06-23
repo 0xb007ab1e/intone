@@ -1,25 +1,25 @@
 # Voices & speech configuration
 
-oxeye speaks through **speech-dispatcher** on Linux, which is *engine-agnostic*: it fronts
+intone speaks through **speech-dispatcher** on Linux, which is *engine-agnostic*: it fronts
 multiple text-to-speech **output modules** (espeak-ng, Piper, mbrola, …), each exposing one or
-more **voices**. oxeye therefore supports any voice your speech-dispatcher install offers — pick
-one with the `oxeye config` commands below. The defaults are fully open-source (espeak-ng), and
-oxeye never requires a proprietary/cloud engine.
+more **voices**. intone therefore supports any voice your speech-dispatcher install offers — pick
+one with the `intone config` commands below. The defaults are fully open-source (espeak-ng), and
+intone never requires a proprietary/cloud engine.
 
 ## Configuring speech
 
-All settings persist to the user config file (`oxeye exclusions path` prints its location) and
+All settings persist to the user config file (`intone exclusions path` prints its location) and
 take effect the next time the reader starts.
 
 | Command | Effect |
 |---|---|
-| `oxeye config voice <name>` | Set the synthesis voice (engine-specific name). `default` clears it. |
-| `oxeye config module <name>` | Set the speech-dispatcher output module (e.g. `espeak-ng`, `piper`). `default` clears it. |
-| `oxeye config language <tag>` | Set the language as a BCP-47 tag (e.g. `en`, `es`). `default` clears it. |
-| `oxeye config rate <0–100>` | Speaking rate (50 = normal). |
-| `oxeye config pitch <0–100>` | Voice pitch (50 = normal). |
-| `oxeye config volume <0–100>` | Volume (100 = full). |
-| `oxeye config show` | Print the current configuration, including all speech settings. |
+| `intone config voice <name>` | Set the synthesis voice (engine-specific name). `default` clears it. |
+| `intone config module <name>` | Set the speech-dispatcher output module (e.g. `espeak-ng`, `piper`). `default` clears it. |
+| `intone config language <tag>` | Set the language as a BCP-47 tag (e.g. `en`, `es`). `default` clears it. |
+| `intone config rate <0–100>` | Speaking rate (50 = normal). |
+| `intone config pitch <0–100>` | Voice pitch (50 = normal). |
+| `intone config volume <0–100>` | Volume (100 = full). |
+| `intone config show` | Print the current configuration, including all speech settings. |
 
 For `voice` / `module` / `language`, the literal value `default` reverts to the engine default.
 Levels are validated 0–100 (a value above 100 is rejected, not silently clamped).
@@ -27,14 +27,14 @@ Levels are validated 0–100 (a value above 100 is rejected, not silently clampe
 ## Discovering voices
 
 ```console
-$ oxeye voices list
+$ intone voices list
 output modules: espeak-ng
-14805 voices across 140 languages — refine with `oxeye voices list --language <tag>`:
+14805 voices across 140 languages — refine with `intone voices list --language <tag>`:
   en-GB (105)
   en-US (105)
   …
 
-$ oxeye voices list --language en
+$ intone voices list --language en
 voices for language 'en' (945):
   English (Great Britain) [en-GB]
   English (Great Britain)+Alan [en-GB-Alan]
@@ -47,9 +47,9 @@ case-insensitive **prefix** match, so `en` lists every English locale; a long re
 and the remainder summarised.
 
 Voices are reported for the **currently selected output module**. To browse another module's
-voices, switch to it first (`oxeye config module <name>`) and re-run `oxeye voices list`.
+voices, switch to it first (`intone config module <name>`) and re-run `intone voices list`.
 
-> `oxeye voices list` queries the speech-dispatcher daemon; if it isn't running, start it once
+> `intone voices list` queries the speech-dispatcher daemon; if it isn't running, start it once
 > (e.g. `spd-say hello`) and retry.
 
 ## Switching voices on the fly
@@ -59,14 +59,14 @@ running to jump to the next one — the new voice announces its own name so you 
 immediately:
 
 ```console
-$ oxeye config rotation Alan Klaus "English (Great Britain)"   # set the cycle (in order)
-$ oxeye config rotation                                        # no names clears it
-$ oxeye config show                                            # shows "voice rotation: …"
+$ intone config rotation Alan Klaus "English (Great Britain)"   # set the cycle (in order)
+$ intone config rotation                                        # no names clears it
+$ intone config show                                            # shows "voice rotation: …"
 ```
 
 Each press advances through the list and wraps around. With no rotation configured, Ctrl+Alt+V
 says so. (The switch applies to the running session; the persisted default voice is still
-`oxeye config voice <name>`.)
+`intone config voice <name>`.)
 
 ## Output modules (OSS engines)
 
@@ -74,7 +74,7 @@ says so. (The switch applies to the running session; the persisted default voice
 
 [espeak-ng](https://github.com/espeak-ng/espeak-ng) ships with speech-dispatcher and needs no
 setup. It is compact, extremely responsive, and covers 100+ languages. It is the default module,
-so oxeye works out of the box with no configuration. Its voices are formant-synthesis (robotic),
+so intone works out of the box with no configuration. Its voices are formant-synthesis (robotic),
 which many screen-reader users prefer for speed and intelligibility at high rates.
 
 ### Piper — neural, higher quality (optional)
@@ -88,12 +88,12 @@ shell command), not a built-in module, so it takes some one-time setup:
 2. Add a generic module + `AudioOutputMethod` to `~/.config/speech-dispatcher/speechd.conf`
    following the speech-dispatcher Piper instructions (see the references below). An audio player
    is required (`pw-play` for PipeWire, `paplay` for PulseAudio, `aplay` for ALSA).
-3. Restart speech-dispatcher, confirm the module appears in `oxeye voices list`, then select it:
+3. Restart speech-dispatcher, confirm the module appears in `intone voices list`, then select it:
 
    ```console
-   $ oxeye config module piper      # use the module name your config defined
-   $ oxeye voices list              # voices now reflect Piper
-   $ oxeye config voice <name>
+   $ intone config module piper      # use the module name your config defined
+   $ intone voices list              # voices now reflect Piper
+   $ intone config voice <name>
    ```
 
 Piper still uses espeak-ng internally for text-to-phoneme conversion, so keep espeak-ng
@@ -105,7 +105,7 @@ installed.
 ### Other modules
 
 Any speech-dispatcher module you install (e.g. **mbrola** voices for espeak, festival) appears in
-`oxeye voices list` and can be selected the same way. oxeye is deliberately engine-agnostic.
+`intone voices list` and can be selected the same way. intone is deliberately engine-agnostic.
 
 ## References
 

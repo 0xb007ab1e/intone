@@ -57,7 +57,7 @@ crate's intended behaviour.
 - **Upstream:** the SIGSEGV in Qt's AT-SPI bridge on `Properties.GetAll` for the `Accessible`
   interface looks like a genuine Qt bug worth reporting to KDE/Qt if it can be reproduced
   safely (e.g. with `busctl --user call … org.freedesktop.DBus.Properties GetAll …` against a
-  Qt app's accessible object). Out of scope for oxeye; noted for whoever has a throwaway
+  Qt app's accessible object). Out of scope for intone; noted for whoever has a throwaway
   session.
 
 ## References

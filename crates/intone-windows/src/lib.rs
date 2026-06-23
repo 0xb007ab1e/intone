@@ -1,13 +1,13 @@
-//! `oxeye-windows` — the Windows back-end of the **oxeye** screen reader.
+//! `intone-windows` — the Windows back-end of the **intone** screen reader.
 //!
 //! This crate is deliberately thin: it adapts Windows **UI Automation** (UIA) — reading the
 //! focused element and (later) its events and speech — and hands the data to the reusable,
-//! platform-agnostic policy in [`oxeye_core`] (announcement composition, exclusions, verbosity,
-//! navigation, braille). The same core that drives `oxeye-linux` drives this; only the
+//! platform-agnostic policy in [`intone_core`] (announcement composition, exclusions, verbosity,
+//! navigation, braille). The same core that drives `intone-linux` drives this; only the
 //! accessibility-tree, event, and output adapters differ.
 //!
 //! UIA is reached through COM, which is an FFI boundary requiring `unsafe`; that is confined to
-//! the [`uia`] module (see this crate's `unsafe_code = "allow"` lint override). `oxeye-core`
+//! the [`uia`] module (see this crate's `unsafe_code = "allow"` lint override). `intone-core`
 //! itself remains `unsafe`-free.
 
 #[cfg(windows)]
@@ -33,7 +33,7 @@ pub fn run() -> anyhow::Result<()> {
 #[cfg(not(windows))]
 pub fn run() -> anyhow::Result<()> {
     anyhow::bail!(
-        "oxeye-windows requires the Windows UI Automation APIs; this host is {}",
+        "intone-windows requires the Windows UI Automation APIs; this host is {}",
         std::env::consts::OS
     )
 }

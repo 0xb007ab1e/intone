@@ -57,7 +57,7 @@ pub struct Speech {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_module: Option<String>,
     /// Voice names to cycle through with the in-app switch hotkey (Ctrl+Alt+V on Linux). Empty
-    /// disables cycling. Each name is what `oxeye config voice <name>` would accept.
+    /// disables cycling. Each name is what `intone config voice <name>` would accept.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rotation: Vec<String>,
 }
@@ -133,16 +133,16 @@ impl Settings {
     }
 }
 
-/// The directory where oxeye stores per-user configuration.
+/// The directory where intone stores per-user configuration.
 ///
 /// # Errors
 /// Returns [`Error::NoConfigDir`] if no config directory can be determined.
 pub fn config_dir() -> Result<PathBuf> {
-    let dirs = ProjectDirs::from("", "oxeye", "oxeye").ok_or(Error::NoConfigDir)?;
+    let dirs = ProjectDirs::from("", "intone", "intone").ok_or(Error::NoConfigDir)?;
     Ok(dirs.config_dir().to_path_buf())
 }
 
-/// The path to oxeye's settings file.
+/// The path to intone's settings file.
 ///
 /// # Errors
 /// Returns [`Error::NoConfigDir`] if no config directory can be determined.

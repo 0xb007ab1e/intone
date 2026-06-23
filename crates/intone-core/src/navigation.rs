@@ -71,7 +71,7 @@ impl NavCategory {
     }
 }
 
-/// Classify an (AT-SPI) role name into a navigation category, if it is one oxeye surfaces.
+/// Classify an (AT-SPI) role name into a navigation category, if it is one intone surfaces.
 /// Role names follow AT-SPI's `Role::name()` (e.g. `"push button"`, `"heading"`, `"link"`).
 #[must_use]
 pub fn classify(role: &str) -> Option<NavCategory> {

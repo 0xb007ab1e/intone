@@ -1,22 +1,22 @@
 [package]
-name = "oxeye-cli"
+name = "intone-cli"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Command-line configuration manager for the oxeye screen reader (exclusions, config)."
+description = "Command-line configuration manager for the intone screen reader (exclusions, config)."
 
-# User-facing command is `oxeye`; the library holds the testable, disk-free logic.
+# User-facing command is `intone`; the library holds the testable, disk-free logic.
 [[bin]]
-name = "oxeye"
+name = "intone"
 path = "src/main.rs"
 
 [lints]
 workspace = true
 
 [dependencies]
-oxeye-core = { path = "../oxeye-core", version = "0.1.0" }
+intone-core = { path = "../intone-core", version = "0.1.0" }
 clap = { workspace = true }
 anyhow = { workspace = true }
 # Synchronous SSIP client (no async runtime) to enumerate speech-dispatcher modules/voices.
