@@ -140,8 +140,14 @@ mod tests {
 
     #[test]
     fn pitch_multiplier_centers_at_one() {
-        assert!((pitch_multiplier(50) - 1.0).abs() < f32::EPSILON, "50 = normal");
-        assert!((pitch_multiplier(0) - 0.5).abs() < f32::EPSILON, "0 = lowest");
+        assert!(
+            (pitch_multiplier(50) - 1.0).abs() < f32::EPSILON,
+            "50 = normal"
+        );
+        assert!(
+            (pitch_multiplier(0) - 0.5).abs() < f32::EPSILON,
+            "0 = lowest"
+        );
         assert!(
             (pitch_multiplier(100) - 2.0).abs() < f32::EPSILON,
             "100 = highest"
