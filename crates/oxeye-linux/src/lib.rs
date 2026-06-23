@@ -44,8 +44,6 @@ use oxeye_core::{Settings, Speech};
 /// X keysyms for the keys we react to.
 const KEYSYM_CONTROL_L: u32 = 0xffe3;
 const KEYSYM_CONTROL_R: u32 = 0xffe4;
-const KEYSYM_ALT_L: u32 = 0xffe9;
-const KEYSYM_ALT_R: u32 = 0xffea;
 const KEYSYM_PAUSE: u32 = 0xff13;
 const KEYSYM_O: u32 = 0x6f;
 const KEYSYM_S: u32 = 0x73;
@@ -205,6 +203,58 @@ struct Keyboard {
     proxy: KeyboardMonitorProxy<'static>,
 }
 
+/// The key-grab request oxeye sends KWin: `(modifiers, keystrokes)` for `SetKeyGrabs`.
+///
+/// `modifiers` is deliberately **empty**. A keysym listed there is *consumed* by the
+/// compositor — KWin's `a11ykeyboardmonitor.cpp` `processKey` returns `true` (intercepts) for
+/// any key in that list — so registering Control/Alt there swallows every Control and Alt
+/// press before the focused application ever sees it, killing all Ctrl/Alt shortcuts and
+/// effectively locking the keyboard. We only need to *consume* the specific Ctrl+Alt+<letter>
+/// combos, which is exactly what `keystrokes` does. Bare Control still reaches us via
+/// `watch_keyboard` pass-through (emitted, but `processKey` returns `false`) for the "silence"
+/// hotkey while continuing on to the app.
+fn key_grab_spec() -> (Vec<u32>, Vec<(u32, u32)>) {
+    let ctrl_alt = MOD_CONTROL | MOD_ALT;
+    let ctrl_alt_shift = MOD_CONTROL | MOD_ALT | MOD_SHIFT;
+    let keystrokes = vec![
+        (KEYSYM_O, ctrl_alt),
+        (KEYSYM_S, ctrl_alt),
+        (KEYSYM_H, ctrl_alt),
+        (KEYSYM_H, ctrl_alt_shift),
+        (KEYSYM_B, ctrl_alt),
+        (KEYSYM_B, ctrl_alt_shift),
+        (KEYSYM_L, ctrl_alt),
+        (KEYSYM_L, ctrl_alt_shift),
+        (KEYSYM_F, ctrl_alt),
+        (KEYSYM_F, ctrl_alt_shift),
+    ];
+    (Vec::new(), keystrokes)
+}
+
+#[cfg(test)]
+mod key_grab_tests {
+    use super::{key_grab_spec, KEYSYM_S, MOD_ALT, MOD_CONTROL};
+
+    #[test]
+    fn never_grabs_standalone_modifier_keys() {
+        let (modifiers, keystrokes) = key_grab_spec();
+        // Regression guard: a non-empty `modifiers` list makes KWin consume those bare keys,
+        // swallowing every Ctrl/Alt shortcut before the app sees it (the keyboard lockup).
+        assert!(
+            modifiers.is_empty(),
+            "must not grab standalone modifier keys"
+        );
+        // The dedicated hotkeys are still consumed, but only as full Ctrl+Alt combos.
+        let ctrl_alt = MOD_CONTROL | MOD_ALT;
+        assert!(keystrokes.contains(&(KEYSYM_S, ctrl_alt)));
+        assert_eq!(keystrokes.len(), 10);
+        assert!(
+            keystrokes.iter().all(|(_, m)| m & ctrl_alt == ctrl_alt),
+            "every grabbed keystroke carries Ctrl+Alt, never a bare key"
+        );
+    }
+}
+
 /// Best-effort hotkey setup: declare a screen reader is active, claim the well-known name
 /// KWin requires, and start watching keys. Returns `None` (rather than erroring) when the
 /// compositor doesn't provide `KeyboardMonitor`, so focus readout still works on non-KWin
@@ -224,27 +274,9 @@ async fn setup_keyboard() -> Option<Keyboard> {
     proxy.watch_keyboard().await.ok()?;
     // Grab dedicated, *consumed* shortcuts (won't reach the focused app): Ctrl+Alt+O (time),
     // Ctrl+Alt+S (structure summary), and Ctrl+Alt+{H,B,L,F} to move to the next element of a
-    // type (heading/button/link/form field); add Shift for the previous one.
-    let modifiers = vec![
-        KEYSYM_CONTROL_L,
-        KEYSYM_CONTROL_R,
-        KEYSYM_ALT_L,
-        KEYSYM_ALT_R,
-    ];
-    let ctrl_alt = MOD_CONTROL | MOD_ALT;
-    let ctrl_alt_shift = MOD_CONTROL | MOD_ALT | MOD_SHIFT;
-    let grabs = vec![
-        (KEYSYM_O, ctrl_alt),
-        (KEYSYM_S, ctrl_alt),
-        (KEYSYM_H, ctrl_alt),
-        (KEYSYM_H, ctrl_alt_shift),
-        (KEYSYM_B, ctrl_alt),
-        (KEYSYM_B, ctrl_alt_shift),
-        (KEYSYM_L, ctrl_alt),
-        (KEYSYM_L, ctrl_alt_shift),
-        (KEYSYM_F, ctrl_alt),
-        (KEYSYM_F, ctrl_alt_shift),
-    ];
+    // type (heading/button/link/form field); add Shift for the previous one. The standalone-
+    // modifier list stays empty on purpose — see `key_grab_spec`.
+    let (modifiers, grabs) = key_grab_spec();
     let _ = proxy.set_key_grabs(modifiers, grabs).await;
     Some(Keyboard {
         session,
